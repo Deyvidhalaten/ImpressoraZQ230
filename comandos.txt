@@ -1,0 +1,8 @@
+python setup.py build
+pip install pyinstaller
+pip install flask                     # web framework
+pip install requests                  # para chamadas HTTP (bwip-js, se usar)
+pip install pillow                    # manipulação de imagens
+pip install python-barcode[images]    # gera EAN-13 como PNG
+pip install pywin32                   # impressão via driver no Windows
+python app.py

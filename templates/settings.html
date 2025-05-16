@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Configurar Impressora</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Botão vermelho de Encerrar Sistema -->
+    <form method="POST" action="{{ url_for('shutdown') }}" style="float:right; margin-top:10px;">
+      <input type="password"
+             name="shutdown_password"
+             placeholder="Senha p/ encerrar"
+             required
+             style="padding:4px; width:140px; margin-right:4px;">
+      <button type="submit"
+              style="background:#e74c3c; color:#fff; border:none; padding:6px 12px; cursor:pointer;">
+        Encerrar Sistema
+      </button>
+    </form>
+
+    <div class="nav">
+      <a href="{{ url_for('index') }}">Impressão</a>
+      <a href="{{ url_for('logout') }}">Logout</a>
+    </div>
+
+    <h1>Configurar Impressora</h1>
+    <form method="POST" action="{{ url_for('settings') }}">
+      <label for="ip">Novo IP da Impressora:</label>
+      <input type="text" id="ip" name="ip" value="{{ ip_impressora }}" required>
+
+      <label for="ls_flor">LS Manual Floricultura:</label>
+      <input type="number" id="ls_flor" name="ls_flor" value="{{ ls_flor }}" required>
+
+      <label for="ls_flv">LS Manual FLV:</label>
+      <input type="number" id="ls_flv" name="ls_flv" value="{{ ls_flv }}" required>
+
+      <button type="submit">Salvar Configurações</button>
+    </form>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="{{ 'flash-success' if cat=='success' else 'flash' }}">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+  </div>
+</body>
+</html>

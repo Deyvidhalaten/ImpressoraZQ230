@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Administração</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <div class="nav">
+      <a href="/">Voltar</a>
+    </div>
+
+    <h1>Administração</h1>
+    <form method="POST" action="/login">
+      <label for="username">Usuário:</label>
+      <input type="text" id="username" name="username" required>
+      <label for="password">Senha:</label>
+      <input type="password" id="password" name="password" required>
+      <button type="submit">Entrar</button>
+    </form>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="flash {% if cat=='success' %}flash-success{% endif %}">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+  </div>
+</body>
+</html>

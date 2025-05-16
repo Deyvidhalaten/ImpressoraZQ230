@@ -1,0 +1,51 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Impressão</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <div class="nav">
+      <a href="{{ url_for('index') }}">Impressão</a>
+      {% if session.get('logged_in') %}
+        <a href="{{ url_for('settings') }}">Configurar Impressora</a>
+        <a href="{{ url_for('logout') }}">Logout</a>
+      {% else %}
+        <a href="{{ url_for('login', next=url_for('settings')) }}">Admin</a>
+      {% endif %}
+    </div>
+
+    <h1>Imprimir EAN-13</h1>
+    <form method="POST" action="{{ url_for('index') }}">
+      <label for="codigo">Código EAN-13:</label>
+      <input type="text" id="codigo" name="codigo" required>
+
+      <fieldset style="margin-top:10px;">
+        <legend>Modo de Impressão:</legend>
+        <label><input type="radio" name="modo" value="Floricultura" checked> Floricultura</label>
+        <label><input type="radio" name="modo" value="FLV"> FLV</label>
+      </fieldset>
+
+      <div style="margin-top:15px;">
+        <!-- Botão para imprimir (valida o formulário) -->
+        <button type="submit" name="action" value="print">Imprimir</button>
+        <!-- Botão para enviar carga (ignora validação do campo required) -->
+        <button type="submit"
+                name="action"
+                value="load"
+                formnovalidate>Enviar Carga</button>
+      </div>
+    </form>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="{{ 'flash-success' if cat=='success' else 'flash' }}">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+  </div>
+</body>
+</html>
