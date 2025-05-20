@@ -4,12 +4,13 @@ import socket
 import tempfile
 import urllib3
 import requests
+import csv
 
 import win32print  # type: ignore
 import win32ui     # type: ignore
 
 from datetime import timedelta
-from PIL import Image, ImageWin
+from PIL import Image, ImageWin, ImageDraw, ImageFont
 from flask import (
     Flask, render_template, request, redirect,
     flash, session, url_for
@@ -18,6 +19,7 @@ from flask import (
 # --- CONFIGURAÇÃO DE PERSISTÊNCIA ---
 BASE_DIR     = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
 CONFIG_FILE  = os.path.join(BASE_DIR, 'config.txt')
+CSV_FILE     = os.path.join(BASE_DIR, 'baseFloricultura.csv')
 
 DEFAULT_IP       = "10.17.30.119"
 DEFAULT_PORTA    = 9100
@@ -32,6 +34,7 @@ IP_IMPRESSORA    = DEFAULT_IP
 PORTA_IMPRESSORA = DEFAULT_PORTA
 LS_FLOR_VALUE    = DEFAULT_LS_FLOR
 LS_FLV_VALUE     = DEFAULT_LS_FLV
+
 
 def load_config():
     global IP_IMPRESSORA, LS_FLOR_VALUE, LS_FLV_VALUE
@@ -50,11 +53,13 @@ def load_config():
                 try: LS_FLV_VALUE = int(val)
                 except: pass
 
+
 def save_config():
     with open(CONFIG_FILE, 'w') as f:
         f.write(f"IP_IMPRESSORA={IP_IMPRESSORA}\n")
         f.write(f"LS_FLOR_VALUE={LS_FLOR_VALUE}\n")
         f.write(f"LS_FLV_VALUE={LS_FLV_VALUE}\n")
+
 
 load_config()
 
@@ -67,7 +72,7 @@ app = Flask(
 app.secret_key = 'chave-secreta'
 app.permanent_session_lifetime = timedelta(minutes=5)
 
-# Desativa warnings de SSL caso use bwip-js em algum ponto
+# Desativa warnings de SSL
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- Shutdown server ---
@@ -88,59 +93,105 @@ def shutdown():
     flash("❌ Senha inválida para encerramento", "error")
     return redirect(url_for('settings'))
 
-# --- Geração via Google Charts ---
-'''def gerar_barcode_google(ean: str) -> str:
-    """
-    Baixa o PNG do Google Charts para EAN-13 e retorna o caminho local.
-    """
+# --- Validadores e lookup CSV ---
+def validou_codigo(codigo: str) -> bool:
+    if not codigo.isdigit():
+        return False
+    if len(codigo) < 4 or len(codigo) > 13:
+        return False
+    with open(CSV_FILE, newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if len(codigo) == 13 and row.get('EAN-13') == codigo:
+                return True
+            if len(codigo) < 13 and row.get('Cod.Prod') == codigo:
+                return True
+    return False
+
+
+def lookup_csv(chave: str):
+    # retorna (descricao, codprod, ean13)
+    with open(CSV_FILE, newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if len(chave) == 13 and row.get('EAN-13') == chave:
+                return row.get('Descricao',''), row.get('Cod.Prod',''), row.get('EAN-13','')
+            if len(chave) < 13 and row.get('Cod.Prod') == chave:
+                return row.get('Descricao',''), row.get('Cod.Prod',''), row.get('EAN-13','')
+    return '', '', ''
+
+def gerar_barcode_bwip(ean: str) -> str:
     url = (
-        "https://chart.googleapis.com/chart"
-        f"?cht=ean13&chs=200x100&chld=M|0|0|0&chl={ean}"
+        "https://bwipjs-api.metafloor.com/"
+        f"?bcid=ean13&text={ean}"
+        "&scale=2&height=15&includetext=true&backgroundcolor=FFFFFF"
     )
     tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
     tmp.close()
-    resp = requests.get(url)
+    resp = requests.get(url, verify=False)
     resp.raise_for_status()
     with open(tmp.name, "wb") as f:
         f.write(resp.content)
-    return tmp.name'''
+    return tmp.name
+
+# --- Montagem de etiqueta com texto ---
+def compose_label(ean: str, descricao: str, codprod: str) -> str:
+    # gera o PNG do barcode
+    barcode_png = gerar_barcode_bwip(ean)
+
+    # abre o PNG e cria uma nova imagem um pouco maior para o texto em cima
+    barcode = Image.open(barcode_png)
+    w, h = barcode.size
+    top_margin = 40  # altura reservada para nome+subcódigo
+    label = Image.new("RGB", (w, h + top_margin), "white")
+    label.paste(barcode, (0, top_margin))
+
+    draw = ImageDraw.Draw(label)
+    font = ImageFont.truetype("arial.ttf", size=14)  # ou outro .ttf disponível
+
+    # mede o tamanho do texto da descrição
+    box = draw.textbbox((0, 0), descricao, font=font)  
+    text_w = box[2] - box[0]
+    text_h = box[3] - box[1]
+    # centraliza horizontalmente
+    x_desc = (w - text_w) // 2
+    y_desc = 5
+    draw.text((x_desc, y_desc), descricao, font=font, fill="black")
+
+    # faz o mesmo para o código de produto, logo abaixo da descrição
+    box2 = draw.textbbox((0, 0), codprod, font=font)
+    cp_w = box2[2] - box2[0]
+    x_cp = (w - cp_w) // 2
+    y_cp = y_desc + text_h + 2
+    draw.text((x_cp, y_cp), codprod, font=font, fill="black")
+
+    # salva e retorna caminho
+    out = barcode_png.replace(".png", "_label.png")
+    label.save(out)
+    return out
 
 # --- Impressão via driver Zebra usando ImageWin ---
-Y_OFFSET = 100  # ajuste esse valor conforme necessário
+Y_OFFSET = 50
 
-def print_image_via_driver(image_path: str, printer_name: str=None):
-    """
-    Imprime um PNG via driver Zebra, desenhando no tamanho real da imagem
-    mas deslocado Y_OFFSET pixels para baixo.
-    """
+def print_image_via_driver(image_path: str, x_offset: int, printer_name: str=None):
     if printer_name is None:
         printer_name = win32print.GetDefaultPrinter()
-    print(f"[DEBUG] Enviando para impressora: '{printer_name}'")
-
+    # abre DC
     hDC = win32ui.CreateDC()
     hDC.CreatePrinterDC(printer_name)
-
+    # move origem
+    hDC.SetViewportOrg((x_offset, Y_OFFSET))
+    # carrega e imprime
     img = Image.open(image_path)
     w, h = img.size
-    print(f"[DEBUG] Imagem tamanho: {w}×{h}, Y_OFFSET={Y_OFFSET}")
-
-    if w <= 0 or h <= 0:
-        raise RuntimeError(f"Imagem inválida: largura={w}, altura={h}")
-
-    hDC.StartDoc("Impressão de Código de Barras")
+    hDC.StartDoc("Etiqueta")
     hDC.StartPage()
-
-    # desenha no canto (0, Y_OFFSET), mantendo w×h pixels
     dib = ImageWin.Dib(img)
-    dib.draw(
-        hDC.GetHandleOutput(),
-        (0, Y_OFFSET, w, Y_OFFSET + h)
-    )
-
+    dib.draw(hDC.GetHandleOutput(), (0,0, w, h))
     hDC.EndPage()
     hDC.EndDoc()
 
-# --- Envio legado de ZPL para carga de LS via socket ---
+# --- Envio legado ZPL ---
 def enviar_para_impressora(zpl: str) -> bool:
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -154,51 +205,42 @@ def enviar_para_impressora(zpl: str) -> bool:
 # --- Rota principal ---
 @app.route("/", methods=["GET","POST"])
 def index():
-    if request.method == "POST":
+    if request.method == 'POST':
         codigo = request.form.get('codigo','').strip()
         modo   = request.form.get('modo','Floricultura')
         action = request.form.get('action','print')
 
-        if action == "load":
-            ls  = LS_FLOR_VALUE if modo == "Floricultura" else LS_FLV_VALUE
+        if action == 'load':
+            ls = LS_FLOR_VALUE if modo=='Floricultura' else LS_FLV_VALUE
             zpl = f"^XA\n^MD30\n^LS{ls}\n^XZ"
-            ok  = enviar_para_impressora(zpl)
-            flash(
-                f"✅ Carga '{modo}' (LS={ls}) enviada!" if ok
-                else f"❌ Falha ao enviar carga '{modo}'",
-                "success" if ok else "error"
-            )
+            ok = enviar_para_impressora(zpl)
+            flash(f"✅ Carga '{modo}' (LS={ls}) enviada!", 'success')
             return redirect(url_for('index'))
 
-        if action == "print":
-            if modo == "FLV":
-                flash("❌ Impressão desabilitada em modo FLV", "error")
-            else:
-                if not (codigo.isdigit() and len(codigo) in (12,13)):
-                    flash("❌ Código inválido", "error")
-                else:
-                    png_path = None
-                    try:
-                        png_path = gerar_barcode_bwip(codigo)
-                        print_image_via_driver(png_path,
-                            printer_name="ZDesigner ZD230-203dpi ZPL")
-                        flash("✅ Impressão enviada com sucesso!", "success")
-                    except Exception as e:
-                        flash(f"❌ Erro ao imprimir via driver: {e}", "error")
-                    finally:
-                        if png_path and os.path.exists(png_path):
-                            os.remove(png_path)
-        return redirect(url_for('index'))
+        if action == 'print':
+            if not validou_codigo(codigo):
+                flash("❌ Código não encontrado na base.", 'error')
+                return redirect(url_for('index'))
+            desc, codp, ean = lookup_csv(codigo)
+            png_path = compose_label(ean, desc, codp)
+            x_off = abs(LS_FLOR_VALUE) if modo=='Floricultura' else abs(LS_FLV_VALUE)
+            try:
+                print_image_via_driver(png_path, x_off)
+                flash("✅ Impressão enviada com sucesso!", 'success')
+            except Exception as e:
+                flash(f"❌ Erro ao imprimir via driver: {e}", 'error')
+            finally:
+                if os.path.exists(png_path): os.remove(png_path)
+            return redirect(url_for('index'))
 
-    return render_template("index.html")
+    return render_template('index.html')
 
 # --- Login / Logout / Settings ---
 @app.route("/login", methods=["GET","POST"])
 def login():
     next_page = request.args.get('next', url_for('settings'))
     if request.method == "POST":
-        if (request.form.get('username') == USUARIO and
-            request.form.get('password') == SENHA):
+        if request.form.get('username') == USUARIO and request.form.get('password') == SENHA:
             session.permanent    = True
             session['logged_in']= True
             flash("✅ Login bem-sucedido!", "success")
@@ -220,11 +262,10 @@ def settings():
         return redirect(url_for('login', next=url_for('settings')))
 
     if request.method == "POST":
-        novo_ip = request.form.get('ip','').strip()
-        ls_f    = request.form.get('ls_flor','')
-        ls_v    = request.form.get('ls_flv','')
-        if novo_ip:
-            IP_IMPRESSORA = novo_ip
+        ip = request.form.get('ip','').strip()
+        ls_f = request.form.get('ls_flor','')
+        ls_v = request.form.get('ls_flv','')
+        if ip: IP_IMPRESSORA = ip
         try:
             LS_FLOR_VALUE = int(ls_f)
             LS_FLV_VALUE  = int(ls_v)
@@ -240,33 +281,6 @@ def settings():
         ls_flor=LS_FLOR_VALUE,
         ls_flv=LS_FLV_VALUE
     )
-
-def gerar_barcode_bwip(ean: str) -> str:
-    """
-    Baixa do BWIP-JS um PNG EAN-13 e retorna o caminho local do arquivo.
-    """
-    # montamos a URL com scale menor para não ficar gigante
-    url = (
-        "https://bwipjs-api.metafloor.com/"
-        f"?bcid=ean13&text={ean}"
-        "&scale=2"            # módulo pequeno
-        "&height=15"          # altura em mm
-        "&includetext=true"   # texto abaixo do código
-        "&backgroundcolor=FFFFFF"
-    )
-
-    # cria um temp file .png
-    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-    tmp.close()
-
-    # desabilita verificação SSL (caso seja necessário na sua rede)
-    resp = requests.get(url, verify=False)  
-    resp.raise_for_status()
-
-    with open(tmp.name, "wb") as f:
-        f.write(resp.content)
-
-    return tmp.name
 
 if __name__ == "__main__":
     app.run(debug=False, use_reloader=False)
