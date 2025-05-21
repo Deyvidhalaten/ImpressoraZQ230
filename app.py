@@ -110,27 +110,33 @@ def shutdown():
 
 # --- Validadores e lookup CSV ---
 def validou_codigo(codigo: str) -> bool:
-    if not codigo.isdigit():
+    chave_base = codigo.split('-', 1)[0]
+    if not chave_base.isdigit() or not (4 <= len(chave_base) <= 13):
         return False
-    if len(codigo) < 4 or len(codigo) > 13:
-        return False
-    with open(CSV_FILE, newline='', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            if len(codigo) == 13 and row.get('EAN-13') == codigo:
-                return True
-            if len(codigo) < 13 and row.get('Cod.Prod') == codigo:
-                return True
-    return False
+
+    if len(chave_base) == 13:
+        # EAN-13 precisa bater exatamente
+        return chave_base in DB
+    else:
+        # qualquer Cod.Prod que comece pelo prefixo
+        return any(
+            v['codprod'].startswith(chave_base)
+            for v in DB.values()
+        )
 
 
-def lookup_csv(chave: str):
+def lookup_csv(codigo: str):
     # retorna (descricao, codprod, ean13)
+    chave = codigo.split('-', 1)[0]
+    print(chave)
     with open(CSV_FILE, newline='', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
+            # busca exata por EAN-13
             if len(chave) == 13 and row.get('EAN-13') == chave:
                 return row.get('Descricao',''), row.get('Cod.Prod',''), row.get('EAN-13','')
+            # busca por código reduzido
+            print("Chave 1: "+chave+" Chave 2: "+row.get)
             if len(chave) < 13 and row.get('Cod.Prod') == chave:
                 return row.get('Descricao',''), row.get('Cod.Prod',''), row.get('EAN-13','')
     return '', '', ''
@@ -346,35 +352,37 @@ def index():
         modo   = request.form.get("modo","Floricultura")
         action = request.form.get("action","print")
 
-        # 1) Carga permanente de LS
         if action == "load":
             ls = LS_FLOR_VALUE if modo=="Floricultura" else LS_FLV_VALUE
-            disable_reset_and_set_ls(ls, printer_name=None)
+            disable_reset_and_set_ls(ls)
             flash(f"✅ Carga '{modo}' (LS={ls}) enviada!","success")
             return redirect(url_for("index"))
 
-        # 2) Impressão via driver com base no CSV
         if action == "print":
             if modo=="FLV":
                 flash("❌ Impressão desabilitada em modo FLV","error")
             else:
-                if len(codigo) < 4:
+                if not validou_codigo(codigo):
                     flash("❌ Produto não encontrado","error")
                 else:
-                    rec = DB.get(codigo)
+                    chave_base = codigo.split('-', 1)[0]
+                    # lookup com startswith
+                    if len(chave_base) == 13:
+                        rec = DB.get(chave_base)
+                    else:
+                        rec = next(
+                            (v for v in DB.values() if v['codprod'].startswith(chave_base)),
+                            None
+                        )
+
                     if not rec:
                         flash("❌ Produto não encontrado","error")
                     else:
-                        raw = None
-                        comp = None
+                        raw = gerar_barcode_bwip(rec['ean'])
+                        comp = compose_label(raw, rec['descricao'], rec['codprod'])
+                        xoff = abs(LS_FLOR_VALUE)
                         try:
-                            # 1) gera o código de barras
-                            raw  = gerar_barcode_bwip(rec['ean'])
-                            # 2) compõe etiqueta com texto
-                            comp = compose_label(raw, rec['descricao'], rec['codprod'])
-                            # 3) imprime usando LS correto
-                            xoff = abs(LS_FLOR_VALUE)
-                            print_image_via_driver(comp, xoff, printer_name=None)
+                            print_image_via_driver(comp, xoff)
                             flash("✅ Impressão enviada com sucesso!","success")
                         except Exception as e:
                             flash(f"❌ Erro ao imprimir: {e}","error")
