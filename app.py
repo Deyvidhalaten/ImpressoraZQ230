@@ -35,6 +35,21 @@ PORTA_IMPRESSORA = DEFAULT_PORTA
 LS_FLOR_VALUE    = DEFAULT_LS_FLOR
 LS_FLV_VALUE     = DEFAULT_LS_FLV
 
+# --- Carrega base CSV em memória ---
+def load_db():
+    db = {}
+    if not os.path.exists(CSV_FILE):
+        return db
+    with open(CSV_FILE, newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            ean    = row['EAN-13'].strip()
+            desc   = row['Descricao'].strip()
+            codprod= row['Cod.Prod'].strip()
+            # indexa pelos dois campos
+            db[ean]     = {'ean': ean, 'descricao': desc, 'codprod': codprod}
+            db[codprod] = {'ean': ean, 'descricao': desc, 'codprod': codprod}
+    return db
 
 def load_config():
     global IP_IMPRESSORA, LS_FLOR_VALUE, LS_FLV_VALUE
@@ -133,6 +148,7 @@ def gerar_barcode_bwip(ean: str) -> str:
     with open(tmp.name, "wb") as f:
         f.write(resp.content)
     return tmp.name
+
 
 # --- Montagem de etiqueta com texto ---
 def compose_label(ean: str, descricao: str, codprod: str) -> str:
@@ -262,50 +278,113 @@ def disable_reset_and_set_ls(ls_value: int, printer_name: str = None):
     # Junta PJL + ZPL e envia
     print_raw_zpl(pjl + zpl, printer_name)
 
+# --- Compor imagem final com texto acima ---
+def compose_label(barcode_path: str, descricao: str, codprod: str) -> str:
+    # Carrega o código de barras
+    img = Image.open(barcode_path)
+    largura, altura = img.size
+
+    # Espaço extra no topo para texto
+    padding_top = 40
+    nova = Image.new("RGB", (largura, altura + padding_top), "white")
+    draw = ImageDraw.Draw(nova)
+    font = ImageFont.truetype("arial.ttf", 14)
+
+    # 1) Desenha a descrição no topo
+    bbox = draw.textbbox((0, 0), descricao, font=font)
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+    x = (largura - text_w) // 2
+    y = 5
+    draw.text((x, y), descricao, fill="black", font=font)
+
+    # 2) Desenha o código do produto logo abaixo
+    cod_text = f"Código: {codprod}"
+    bbox2 = draw.textbbox((0, 0), cod_text, font=font)
+    c_w = bbox2[2] - bbox2[0]
+    c_h = bbox2[3] - bbox2[1]
+    x2 = (largura - c_w) // 2
+    y2 = y + text_h + 5
+    draw.text((x2, y2), cod_text, fill="black", font=font)
+
+    # 3) Cola o código de barras abaixo do texto
+    nova.paste(img, (0, padding_top))
+
+    # Salva e retorna o caminho da imagem composta
+    out_path = barcode_path.replace(".png", "_label.png")
+    nova.save(out_path)
+    return out_path
+
+# --- Imprime via GDI sem reset ---
+def print_image_via_driver(image_path: str, x_offset: int, printer_name: str = None):
+    if printer_name is None:
+        printer_name = win32print.GetDefaultPrinter()
+    # reaplica noreset antes
+    disable_reset_and_set_ls(x_offset if x_offset >= 0 else -x_offset, printer_name)
+    hDC = win32ui.CreateDC()
+    hDC.CreatePrinterDC(printer_name)
+    # move a origem
+    hDC.SetViewportOrg((x_offset, Y_OFFSET))
+    img = Image.open(image_path)
+    w, h = img.size
+    hDC.StartDoc("Etiqueta")
+    hDC.StartPage()
+    dib = ImageWin.Dib(img)
+    dib.draw(hDC.GetHandleOutput(), (0, 0, w, h))
+    hDC.EndPage()
+    hDC.EndDoc()
+    # reaplica noreset depois
+    disable_reset_and_set_ls(x_offset if x_offset >= 0 else -x_offset, printer_name)
+
+DB = load_db()
+Y_OFFSET = 50  # fixo vertical
 # --- Rota principal ---
 @app.route("/", methods=["GET","POST"])
 def index():
-    if request.method == 'POST':
-        codigo = request.form.get('codigo','').strip()
-        modo   = request.form.get('modo','Floricultura')
-        action = request.form.get('action','print')
+    if request.method == "POST":
+        codigo = request.form.get("codigo","").strip()
+        modo   = request.form.get("modo","Floricultura")
+        action = request.form.get("action","print")
 
-        if action == 'load':
-            # seu código existente para o botão "Enviar Carga"
-            ls = LS_FLOR_VALUE if modo=='Floricultura' else LS_FLV_VALUE
-            zpl = f"^XA\n^MD30\n^LS{ls}\n^XZ"
-            ok = enviar_para_impressora(zpl)
-            flash(f"✅ Carga '{modo}' (LS={ls}) enviada!", 'success' if ok else 'error')
-            return redirect(url_for('index'))
+        # 1) Carga permanente de LS
+        if action == "load":
+            ls = LS_FLOR_VALUE if modo=="Floricultura" else LS_FLV_VALUE
+            disable_reset_and_set_ls(ls, printer_name=None)
+            flash(f"✅ Carga '{modo}' (LS={ls}) enviada!","success")
+            return redirect(url_for("index"))
 
-        if action == 'print':
-            if not validou_codigo(codigo):
-                flash("❌ Código não encontrado na base.", 'error')
-                return redirect(url_for('index'))
+        # 2) Impressão via driver com base no CSV
+        if action == "print":
+            if modo=="FLV":
+                flash("❌ Impressão desabilitada em modo FLV","error")
+            else:
+                if len(codigo) < 4:
+                    flash("❌ Produto não encontrado","error")
+                else:
+                    rec = DB.get(codigo)
+                    if not rec:
+                        flash("❌ Produto não encontrado","error")
+                    else:
+                        raw = None
+                        comp = None
+                        try:
+                            # 1) gera o código de barras
+                            raw  = gerar_barcode_bwip(rec['ean'])
+                            # 2) compõe etiqueta com texto
+                            comp = compose_label(raw, rec['descricao'], rec['codprod'])
+                            # 3) imprime usando LS correto
+                            xoff = abs(LS_FLOR_VALUE)
+                            print_image_via_driver(comp, xoff, printer_name=None)
+                            flash("✅ Impressão enviada com sucesso!","success")
+                        except Exception as e:
+                            flash(f"❌ Erro ao imprimir: {e}","error")
+                        finally:
+                            for path in (raw, comp):
+                                if path and os.path.exists(path):
+                                    os.remove(path)
+            return redirect(url_for("index"))
 
-            # busca e compõe
-            desc, codp, ean = lookup_csv(codigo)
-            png_path = compose_label(ean, desc, codp)
-            x_off = abs(LS_FLOR_VALUE) if modo=='Floricultura' else abs(LS_FLV_VALUE)
-
-            try:
-                # 1) recarrega o LS
-                load_ls(modo)
-
-                # 2) agora imprime via driver
-                print_image_via_driver(png_path, x_off, printer_name=None)
-                flash("✅ Impressão enviada com sucesso!", 'success')
-
-            except Exception as e:
-                flash(f"❌ Erro ao imprimir: {e}", 'error')
-
-            finally:
-                if png_path and os.path.exists(png_path):
-                    os.remove(png_path)
-
-            return redirect(url_for('index'))
-
-    return render_template('index.html')
+    return render_template("index.html")
 
 def send_ls_config(modo: str):
     """Envia o ^LS configurado na impressora para preservar a margem."""
