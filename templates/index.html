@@ -20,26 +20,36 @@
     </div>
 
     <h1>Imprimir EAN-13</h1>
-    <form method="POST" action="{{ url_for('index') }}">
-      <label for="codigo">Código EAN-13:</label>
-      <input type="text" id="codigo" name="codigo" required>
+    <<form method="POST" action="{{ url_for('index') }}">
+  <label for="codigo">Código EAN-13:</label>
+  <input type="text" id="codigo" name="codigo" required>
 
-      <fieldset style="margin-top:10px;">
-        <legend>Modo de Impressão:</legend>
-        <label><input type="radio" name="modo" value="Floricultura" checked> Floricultura</label>
-        <label><input type="radio" name="modo" value="FLV"> FLV</label>
-      </fieldset>
+  <fieldset style="margin-top:10px;">
+    <legend>Modo de Impressão:</legend>
+    <label><input type="radio" name="modo" value="Floricultura" checked> Floricultura</label>
+    <label><input type="radio" name="modo" value="FLV"> FLV</label>
+  </fieldset>
 
-      <div style="margin-top:15px;">
-        <!-- Botão para imprimir (valida o formulário) -->
-        <button type="submit" name="action" value="print">Imprimir</button>
-        <!-- Botão para enviar carga (ignora validação do campo required) -->
-        <button type="submit"
-                name="action"
-                value="load"
-                formnovalidate>Enviar Carga</button>
-      </div>
-    </form>
+  <label for="copies" style="margin-top:10px;">Cópias (1–100):</label>
+  <input 
+    type="number" 
+    id="copies" 
+    name="copies" 
+    value="1" 
+    min="1" 
+    max="100" 
+    required
+    style="width:60px;"
+  >
+
+  <div style="margin-top:15px;">
+    <button type="submit" name="action" value="print">Imprimir</button>
+    <button type="submit"
+            name="action"
+            value="load"
+            formnovalidate>Enviar Carga</button>
+  </div>
+</form>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for cat, msg in messages %}

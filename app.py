@@ -342,8 +342,24 @@ def print_image_via_driver(image_path: str, x_offset: int, printer_name: str = N
     # reaplica noreset depois
     disable_reset_and_set_ls(x_offset if x_offset >= 0 else -x_offset, printer_name)
 
+def compose_double_label(label_path: str, gap: int = 140) -> str:
+    img = Image.open(label_path)
+    w, h = img.size
+
+    # canvas com largura = 2×w + gap
+    canvas = Image.new("RGB", (2*w + gap, h), "white")
+    # primeira etiqueta colada à esquerda
+    canvas.paste(img, (0, 0))
+    # segunda etiqueta colada após w + gap pixels
+    canvas.paste(img, (w + gap, 0))
+
+    out_path = label_path.replace("_label.png", f"_double_{gap}px_gap.png")
+    canvas.save(out_path)
+    return out_path
+
 DB = load_db()
 Y_OFFSET = 50  # fixo vertical
+
 # --- Rota principal ---
 @app.route("/", methods=["GET","POST"])
 def index():
@@ -352,48 +368,71 @@ def index():
         modo   = request.form.get("modo","Floricultura")
         action = request.form.get("action","print")
 
+        # Carregar LS permanentemente
         if action == "load":
             ls = LS_FLOR_VALUE if modo=="Floricultura" else LS_FLV_VALUE
-            disable_reset_and_set_ls(ls)
+            disable_reset_and_set_ls(ls_value=ls)
             flash(f"✅ Carga '{modo}' (LS={ls}) enviada!","success")
             return redirect(url_for("index"))
 
+        # Impressão
         if action == "print":
-            if modo=="FLV":
-                flash("❌ Impressão desabilitada em modo FLV","error")
-            else:
-                if not validou_codigo(codigo):
-                    flash("❌ Produto não encontrado","error")
-                else:
-                    chave_base = codigo.split('-', 1)[0]
-                    # lookup com startswith
-                    if len(chave_base) == 13:
-                        rec = DB.get(chave_base)
-                    else:
-                        rec = next(
-                            (v for v in DB.values() if v['codprod'].startswith(chave_base)),
-                            None
-                        )
+            # ler/limitar cópias
+            try:
+                copies = int(request.form.get("copies","1"))
+            except ValueError:
+                copies = 1
+            copies = max(1, min(copies, 100))
 
-                    if not rec:
-                        flash("❌ Produto não encontrado","error")
-                    else:
-                        raw = gerar_barcode_bwip(rec['ean'])
-                        comp = compose_label(raw, rec['descricao'], rec['codprod'])
-                        xoff = abs(LS_FLOR_VALUE)
-                        try:
-                            print_image_via_driver(comp, xoff)
-                            flash("✅ Impressão enviada com sucesso!","success")
-                        except Exception as e:
-                            flash(f"❌ Erro ao imprimir: {e}","error")
-                        finally:
-                            for path in (raw, comp):
-                                if path and os.path.exists(path):
-                                    os.remove(path)
+            if modo == "FLV":
+                flash("❌ Impressão desabilitada em modo FLV","error")
+                return redirect(url_for("index"))
+
+            if not validou_codigo(codigo):
+                flash("❌ Produto não encontrado","error")
+                return redirect(url_for("index"))
+
+            # tira sufixo "-X" antes da busca
+            chave_base = codigo.split("-",1)[0]
+            if len(chave_base) == 13:
+                rec = DB.get(chave_base)
+            else:
+                rec = next(
+                    (v for v in DB.values() if v['codprod'].startswith(chave_base)),
+                    None
+                )
+
+            if not rec:
+                flash("❌ Produto não encontrado","error")
+                return redirect(url_for("index"))
+
+            # geração única dos arquivos
+            raw    = gerar_barcode_bwip(rec['ean'])
+            single = compose_label(raw, rec['descricao'], rec['codprod'])
+            double = compose_double_label(single)  # imagem com 2 etiquetas lado a lado
+
+            xoff = abs(LS_FLOR_VALUE)
+
+            try:
+                # reenvia LS antes de imprimir
+                disable_reset_and_set_ls(ls_value=xoff)
+
+                # imprime 'copies' vezes
+                for _ in range(copies):
+                    print_image_via_driver(double, xoff, printer_name=None)
+
+                flash(f"✅ {copies} cópia(s) impressa(s) com sucesso!", "success")
+            except Exception as e:
+                flash(f"❌ Erro ao imprimir: {e}", "error")
+            finally:
+                # cleanup
+                for path in (raw, single, double):
+                    if path and os.path.exists(path):
+                        os.remove(path)
+
             return redirect(url_for("index"))
 
     return render_template("index.html")
-
 def send_ls_config(modo: str):
     """Envia o ^LS configurado na impressora para preservar a margem."""
     ls = LS_FLOR_VALUE if modo == 'Floricultura' else LS_FLV_VALUE
