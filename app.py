@@ -172,22 +172,39 @@ def compose_label(ean: str, descricao: str, codprod: str) -> str:
 
 # --- Impressão via driver Zebra usando ImageWin ---
 Y_OFFSET = 50
+PRINTER_NAME = "ZDesigner ZD230-203dpi ZPL"
 
-def print_image_via_driver(image_path: str, x_offset: int, printer_name: str=None):
+def print_image_via_driver(image_path: str, x_offset: int, printer_name: str = None):
+    """
+    1) Desabilita o reset do driver e reaplica o LS via ZPL (preserva margem)
+    2) Imprime o PNG via GDI já deslocado (x_offset, Y_OFFSET)
+    """
+    # 1) escolhe a impressora
     if printer_name is None:
-        printer_name = win32print.GetDefaultPrinter()
-    # abre DC
+        # usa padrão do Windows, ou nosso nome fixo
+        printer_name = win32print.GetDefaultPrinter() or "ZDesigner ZD230-203dpi ZPL"
+    print(f"[DEBUG] Usando impressora: '{printer_name}'")
+    
+    # 2) antes de desenhar via GDI, manda PJL+ZPL pra desabilitar o reset
+    #    e manter o LS (em dots) conforme a configuração atual
+    ls = x_offset  # já veio como abs(LS_FLOR_VALUE) ou abs(LS_FLV_VALUE)
+    disable_reset_and_set_ls(ls_value=ls, printer_name=printer_name)
+
+    # 3) abre o contexto de impressão GDI
     hDC = win32ui.CreateDC()
     hDC.CreatePrinterDC(printer_name)
-    # move origem
+
+    # 4) move o ponto de origem para aplicar os offsets
     hDC.SetViewportOrg((x_offset, Y_OFFSET))
-    # carrega e imprime
+
+    # 5) carrega e imprime a imagem
     img = Image.open(image_path)
     w, h = img.size
+
     hDC.StartDoc("Etiqueta")
     hDC.StartPage()
     dib = ImageWin.Dib(img)
-    dib.draw(hDC.GetHandleOutput(), (0,0, w, h))
+    dib.draw(hDC.GetHandleOutput(), (0, 0, w, h))
     hDC.EndPage()
     hDC.EndDoc()
 
@@ -202,6 +219,49 @@ def enviar_para_impressora(zpl: str) -> bool:
         print("Erro ao enviar ZPL:", e)
         return False
 
+def print_raw_zpl(zpl_bytes: bytes, printer_name: str = None):
+    """
+    Envia bytes RAW (PJL+ZPL) diretamente para a fila, sem passar
+    pelo GDI, portanto o driver não injeta nenhum reset.
+    """
+    if printer_name is None:
+        printer_name = win32print.GetDefaultPrinter()
+    h = win32print.OpenPrinter(printer_name)
+    try:
+        win32print.StartDocPrinter(h, 1, ("RAW_ZPL", None, "RAW"))
+        win32print.StartPagePrinter(h)
+        win32print.WritePrinter(h, zpl_bytes)
+        win32print.EndPagePrinter(h)
+        win32print.EndDocPrinter(h)
+    finally:
+        win32print.ClosePrinter(h)
+
+def load_ls(modo: str):
+    """
+    Reenvia a carga de LS (margem esquerda) exata que o botão 'Enviar Carga' usa,
+    garantindo que a impressora volte ao LS configurado antes de cada impressão.
+    """
+    ls = LS_FLOR_VALUE if modo == 'Floricultura' else LS_FLV_VALUE
+    zpl = f"^XA\n^MD30\n^LS{ls}\n^XZ"
+    ok = enviar_para_impressora(zpl)
+    if not ok:
+        flash(f"❌ Falha ao recarregar LS antes da impressão (LS={ls})", "error")
+    else:
+        flash(f"🔄 LS recarregado (LS={ls}) antes da impressão", "info")
+
+def disable_reset_and_set_ls(ls_value: int, printer_name: str = None):
+    """
+    1) Envia um bloco PJL que desliga o reset automático do driver (SET RESET=OFF)
+    2) Em seguida envia um bloco ZPL para aplicar ^MD30 e o ^LS desejado
+    Tudo em um único job RAW, de forma que o driver preserve o LS.
+    """
+    # PJL para desabilitar reset automático
+    pjl = b'\x1b%-12345X@PJL SET RESET=OFF\r\n\x1b%-12345X\r\n'
+    # ZPL para atualizar a margem esquerda (LS) permanentemente
+    zpl = f"^XA^MD30^LS{ls_value}^XZ\r\n".encode("ascii")
+    # Junta PJL + ZPL e envia
+    print_raw_zpl(pjl + zpl, printer_name)
+
 # --- Rota principal ---
 @app.route("/", methods=["GET","POST"])
 def index():
@@ -211,29 +271,47 @@ def index():
         action = request.form.get('action','print')
 
         if action == 'load':
+            # seu código existente para o botão "Enviar Carga"
             ls = LS_FLOR_VALUE if modo=='Floricultura' else LS_FLV_VALUE
             zpl = f"^XA\n^MD30\n^LS{ls}\n^XZ"
             ok = enviar_para_impressora(zpl)
-            flash(f"✅ Carga '{modo}' (LS={ls}) enviada!", 'success')
+            flash(f"✅ Carga '{modo}' (LS={ls}) enviada!", 'success' if ok else 'error')
             return redirect(url_for('index'))
 
         if action == 'print':
             if not validou_codigo(codigo):
                 flash("❌ Código não encontrado na base.", 'error')
                 return redirect(url_for('index'))
+
+            # busca e compõe
             desc, codp, ean = lookup_csv(codigo)
             png_path = compose_label(ean, desc, codp)
             x_off = abs(LS_FLOR_VALUE) if modo=='Floricultura' else abs(LS_FLV_VALUE)
+
             try:
-                print_image_via_driver(png_path, x_off)
+                # 1) recarrega o LS
+                load_ls(modo)
+
+                # 2) agora imprime via driver
+                print_image_via_driver(png_path, x_off, printer_name=None)
                 flash("✅ Impressão enviada com sucesso!", 'success')
+
             except Exception as e:
-                flash(f"❌ Erro ao imprimir via driver: {e}", 'error')
+                flash(f"❌ Erro ao imprimir: {e}", 'error')
+
             finally:
-                if os.path.exists(png_path): os.remove(png_path)
+                if png_path and os.path.exists(png_path):
+                    os.remove(png_path)
+
             return redirect(url_for('index'))
 
     return render_template('index.html')
+
+def send_ls_config(modo: str):
+    """Envia o ^LS configurado na impressora para preservar a margem."""
+    ls = LS_FLOR_VALUE if modo == 'Floricultura' else LS_FLV_VALUE
+    disable_reset_and_set_ls(ls, printer_name=PRINTER_NAME)
+    flash(f"🔄 Margem (LS={ls}) reenviada antes da impressão", "info")
 
 # --- Login / Logout / Settings ---
 @app.route("/login", methods=["GET","POST"])
@@ -258,21 +336,33 @@ def logout():
 @app.route("/settings", methods=["GET","POST"])
 def settings():
     global IP_IMPRESSORA, LS_FLOR_VALUE, LS_FLV_VALUE
+
     if not session.get('logged_in'):
         return redirect(url_for('login', next=url_for('settings')))
 
     if request.method == "POST":
-        ip = request.form.get('ip','').strip()
-        ls_f = request.form.get('ls_flor','')
-        ls_v = request.form.get('ls_flv','')
-        if ip: IP_IMPRESSORA = ip
+        novo_ip = request.form.get('ip','').strip()
+        ls_f    = request.form.get('ls_flor','')
+        ls_v    = request.form.get('ls_flv','')
+
+        # Atualiza variáveis globais
+        if novo_ip:
+            IP_IMPRESSORA = novo_ip
         try:
             LS_FLOR_VALUE = int(ls_f)
             LS_FLV_VALUE  = int(ls_v)
-            save_config()
-            flash("✅ Configurações salvas com sucesso!", "success")
         except ValueError:
             flash("❌ Valores inválidos para LS", "error")
+            return redirect(url_for('settings'))
+
+        # Salva no disco e recarrega em memória
+        try:
+            save_config()
+            load_config()
+            flash("✅ Configurações salvas com sucesso!", "success")
+        except Exception as e:
+            flash(f"❌ Falha ao salvar configurações: {e}", "error")
+
         return redirect(url_for('settings'))
 
     return render_template(
