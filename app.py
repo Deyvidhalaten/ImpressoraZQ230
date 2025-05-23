@@ -1,3 +1,5 @@
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 import sys
 import os
 import socket
@@ -15,6 +17,10 @@ from flask import (
     Flask, render_template, request, redirect,
     flash, session, url_for
 )
+
+windows_font = os.path.join(os.environ['WINDIR'], 'Fonts', 'arial.ttf')
+# e quando for instanciar:
+font = ImageFont.truetype(windows_font, size=14)
 
 # --- CONFIGURAÇÃO DE PERSISTÊNCIA ---
 BASE_DIR     = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
