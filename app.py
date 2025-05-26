@@ -198,6 +198,17 @@ def compose_label(ean: str, descricao: str, codprod: str) -> str:
     label.save(out)
     return out
 
+def resolve_printer_name(requested_name: str) -> str:
+    """
+    Varre as impressoras locais/conectadas e retorna o nome
+    completo da primeira que contenha requested_name (case-insensitive).
+    """
+    flags = win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
+    for _, _, name, _ in win32print.EnumPrinters(flags):
+        if requested_name.lower() in name.lower():
+            return name
+    raise RuntimeError(f"Impressora não encontrada: '{requested_name}'")
+
 # --- Impressão via driver Zebra usando ImageWin ---
 Y_OFFSET = 50
 PRINTER_NAME = "ZDesigner ZD230-203dpi ZPL"
@@ -329,7 +340,9 @@ def compose_label(barcode_path: str, descricao: str, codprod: str) -> str:
 
 # --- Imprime via GDI sem reset ---
 def print_image_via_driver(image_path: str, x_offset: int, printer_name: str = None):
-    if printer_name is None:
+    if printer_name:
+        printer_name = resolve_printer_name(printer_name)
+    else:
         printer_name = win32print.GetDefaultPrinter()
     # reaplica noreset antes
     disable_reset_and_set_ls(x_offset if x_offset >= 0 else -x_offset, printer_name)
