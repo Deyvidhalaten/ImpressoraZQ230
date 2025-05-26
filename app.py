@@ -339,7 +339,7 @@ def compose_label(barcode_path: str, descricao: str, codprod: str) -> str:
     return out_path
 
 # --- Imprime via GDI sem reset ---
-def print_image_via_driver(image_path: str, x_offset: int, printer_name: str = None):
+def print_image_via_driver(image_path: str, x_offset: int, printer_name: str):
     if printer_name:
         printer_name = resolve_printer_name(printer_name)
     else:
@@ -438,7 +438,7 @@ def index():
 
                 # imprime 'copies' vezes
                 for _ in range(copies):
-                    print_image_via_driver(double, xoff, printer_name=None)
+                    print_image_via_driver(double, xoff, printer_name="ZD230-203dpi.floricultura")
 
                 flash(f"✅ {copies} cópia(s) impressa(s) com sucesso!", "success")
             except Exception as e:
