@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Configurar Drivers de Impressora</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    .action-btn {
+      margin: 0 20px;
+      padding: 4px 8px;
+    }
+    th.actions, td.actions {
+      min-width: 120px;
+      text-align: center;
+    }
+    table th, table td {
+      padding: 10px 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <div class="nav">
+      <a href="{{ url_for('index') }}">Impressão</a>
+      <a href="{{ url_for('printers') }}" class="active">Impressoras</a>
+      <a href="{{ url_for('logout') }}">Logout</a>
+    </div>
+
+    <h1>Mapeamento de Impressoras</h1>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="{{ 'flash-success' if cat=='success' else 'flash' }}">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <table style="width:100%; margin-bottom:20px; border-collapse: collapse;">
+     <thead>
+  <tr>
+    <th>Loja</th><th>Driver</th><th>Função</th><th>Ações</th>
+  </tr>
+</thead>
+<tbody>
+{% for m in mappings %}
+  <tr>
+    <form method="POST" action="{{ url_for('printers') }}">
+      <td>
+        <input type="number" name="loja" value="{{ m.loja }}" min="1" style="width:4em">
+      </td>
+      <td>
+        <input type="text" name="driver" value="{{ m.driver }}">
+      </td>
+      <td>
+        <input type="text" name="funcao" value="{{ m.funcao }}">
+      </td>
+      <td>
+        <input type="hidden" name="pattern" value="{{ m.pattern }}">
+        <button type="submit" name="action" value="save">💾</button>
+        <button type="submit" name="action" value="delete">❌</button>
+      </td>
+    </form>
+  </tr>
+{% endfor %}
+<!-- E um formulário extra para “+ Nova impressora” -->
+<tr>
+  <form method="POST" action="{{ url_for('printers') }}">
+    <td><input type="number" name="loja" min="1" placeholder="nova"></td>
+    <td><input type="text" name="driver" placeholder="driver"></td>
+    <td><input type="text" name="funcao" placeholder="função"></td>
+    <td><button type="submit" name="action" value="save">➕</button></td>
+  </form>
+</tr>
+</tbody>
+
+  </div>
+</body>
+</html>

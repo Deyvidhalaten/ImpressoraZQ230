@@ -1,0 +1,5 @@
+10.1*,ZD230-203dpi.floricultura,floricultura
+10.4*,ZD230-203dpi.floricultura,floricultura
+10.9*,ZD230-203dpi.floricultura,floricultura
+10.17*,ZD230-203dpi.floricultura
+10.5*,ZD230-203dpi.floricultura,floricultura

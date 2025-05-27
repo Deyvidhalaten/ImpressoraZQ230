@@ -57,6 +57,35 @@ def load_db():
             db[codprod] = {'ean': ean, 'descricao': desc, 'codprod': codprod}
     return db
 
+PRINTERS_FILE = os.path.join(BASE_DIR, 'printers.txt')
+def load_printer_map():
+    """Lê o printers.txt e retorna uma lista de dicts: [{'pattern','driver','loja','funcao'}, ...]"""
+    maps = []
+    if not os.path.exists(PRINTERS_FILE):
+        return maps
+    with open(PRINTERS_FILE, encoding='utf-8') as f:
+        for line in f:
+            parts = [p.strip() for p in line.split(',')]
+            if len(parts) < 2:
+                continue
+            pattern, driver = parts[0], parts[1]
+            funcao = parts[2] if len(parts) >= 3 else ''
+            # extrai apenas o número da loja do padrão "10.<loja>*"
+            try:
+                loja = pattern.split('.')[1].rstrip('*')
+            except:
+                loja = ''
+            maps.append({
+                'pattern': pattern,
+                'driver': driver,
+                'loja': loja,
+                'funcao': funcao
+            })
+    return maps
+
+# logo após definir BASE_DIR:
+load_printer_map()
+
 def load_config():
     global IP_IMPRESSORA, LS_FLOR_VALUE, LS_FLV_VALUE
     if not os.path.exists(CONFIG_FILE):
@@ -73,6 +102,7 @@ def load_config():
             elif key == 'LS_FLV_VALUE':
                 try: LS_FLV_VALUE = int(val)
                 except: pass
+
 
 
 def save_config():
@@ -213,7 +243,7 @@ def resolve_printer_name(requested_name: str) -> str:
 Y_OFFSET = 50
 PRINTER_NAME = "ZDesigner ZD230-203dpi ZPL"
 
-def print_image_via_driver(image_path: str, x_offset: int, printer_name: str = None):
+def print_image_via_driver(image_path: str, x_offset: int, printer_name: str):
     """
     1) Desabilita o reset do driver e reaplica o LS via ZPL (preserva margem)
     2) Imprime o PNG via GDI já deslocado (x_offset, Y_OFFSET)
@@ -225,7 +255,7 @@ def print_image_via_driver(image_path: str, x_offset: int, printer_name: str = N
     print(f"[DEBUG] Usando impressora: '{printer_name}'")
     
     # 2) antes de desenhar via GDI, manda PJL+ZPL pra desabilitar o reset
-    #    e manter o LS (em dots) conforme a configuração atual
+    #    e manter o LS (em dots) 
     ls = x_offset  # já veio como abs(LS_FLOR_VALUE) ou abs(LS_FLV_VALUE)
     disable_reset_and_set_ls(ls_value=ls, printer_name=printer_name)
 
@@ -288,6 +318,19 @@ def load_ls(modo: str):
     else:
         flash(f"🔄 LS recarregado (LS={ls}) antes da impressão", "info")
 
+def get_driver_for_ip(client_ip: str, mappings: list[dict]) -> str:
+    """
+    percorre mappings (vindo de load_printer_map())
+    e retorna o primeiro 'driver' cujo 'pattern' case com client_ip.
+    Ex: pattern="10.17*" casa com client_ip="10.17.30.5".
+    """
+    for m in mappings:
+        prefix = m['pattern'].rstrip('*')
+        if client_ip.startswith(prefix):
+            return m['driver']
+    # fallback para a impressora padrão
+    return win32print.GetDefaultPrinter()
+
 def disable_reset_and_set_ls(ls_value: int, printer_name: str = None):
     """
     1) Envia um bloco PJL que desliga o reset automático do driver (SET RESET=OFF)
@@ -338,29 +381,6 @@ def compose_label(barcode_path: str, descricao: str, codprod: str) -> str:
     nova.save(out_path)
     return out_path
 
-# --- Imprime via GDI sem reset ---
-def print_image_via_driver(image_path: str, x_offset: int, printer_name: str):
-    if printer_name:
-        printer_name = resolve_printer_name(printer_name)
-    else:
-        printer_name = win32print.GetDefaultPrinter()
-    # reaplica noreset antes
-    disable_reset_and_set_ls(x_offset if x_offset >= 0 else -x_offset, printer_name)
-    hDC = win32ui.CreateDC()
-    hDC.CreatePrinterDC(printer_name)
-    # move a origem
-    hDC.SetViewportOrg((x_offset, Y_OFFSET))
-    img = Image.open(image_path)
-    w, h = img.size
-    hDC.StartDoc("Etiqueta")
-    hDC.StartPage()
-    dib = ImageWin.Dib(img)
-    dib.draw(hDC.GetHandleOutput(), (0, 0, w, h))
-    hDC.EndPage()
-    hDC.EndDoc()
-    # reaplica noreset depois
-    disable_reset_and_set_ls(x_offset if x_offset >= 0 else -x_offset, printer_name)
-
 def compose_double_label(label_path: str, gap: int = 140) -> str:
     img = Image.open(label_path)
     w, h = img.size
@@ -382,6 +402,9 @@ Y_OFFSET = 50  # fixo vertical
 # --- Rota principal ---
 @app.route("/", methods=["GET","POST"])
 def index():
+    mappings = load_printer_map()            # lê printers.txt
+    client_ip = request.remote_addr          # IP de quem chamou
+    driver_for_request = get_driver_for_ip(client_ip, mappings)
     if request.method == "POST":
         codigo = request.form.get("codigo","").strip()
         modo   = request.form.get("modo","Floricultura")
@@ -438,7 +461,7 @@ def index():
 
                 # imprime 'copies' vezes
                 for _ in range(copies):
-                    print_image_via_driver(double, xoff, printer_name="ZD230-203dpi.floricultura")
+                    print_image_via_driver(double, xoff, printer_name=driver_for_request)
 
                 flash(f"✅ {copies} cópia(s) impressa(s) com sucesso!", "success")
             except Exception as e:
@@ -471,6 +494,58 @@ def login():
         flash("❌ Credenciais inválidas!", "error")
         return redirect(url_for('login', next=next_page))
     return render_template("login.html")
+
+@app.route("/printers", methods=["GET","POST"])
+def printers():
+    mappings = load_printer_map()
+    # Ordenamento do menor para o maior
+    mappings.sort(key=lambda m: int(m['loja'] or 0))
+    if request.method == "POST":
+        # pega valores do form
+        loja   = request.form.get('loja','').strip()
+        driver = request.form.get('driver','').strip()
+        funcao = request.form.get('funcao','').strip()
+
+        # validação mínima
+        if not loja.isdigit() or not driver:
+            flash("❌ Loja e driver são obrigatórios", "error")
+            return redirect(url_for('printers'))
+
+        # constrói o padrão "10.<loja>*"
+        pattern = f"10.{int(loja)}*"
+
+        # substitui se já existir, ou adiciona novo
+        updated = False
+        for m in mappings:
+            if m['pattern'] == pattern:
+                m['driver'] = driver
+                m['funcao'] = funcao
+                updated = True
+                break
+        if not updated:
+            mappings.append({
+                'pattern': pattern,
+                'driver': driver,
+                'loja': loja,
+                'funcao': funcao
+            })
+
+        # grava o arquivo e dá feedback
+        save_printer_map(mappings)
+        flash("✅ Mapeamento salvo com sucesso!", "success")
+        return redirect(url_for('printers'))
+
+    # GET: renderiza a tabela
+    return render_template("printers.html", mappings=mappings)
+
+def save_printer_map(mappings):
+    """Recebe lista de dicts e grava de volta no printers.txt"""
+    with open(PRINTERS_FILE, 'w', encoding='utf-8') as f:
+        for m in mappings:
+            line = f"{m['pattern']},{m['driver']}"
+            if m.get('funcao'):
+                line += f",{m['funcao']}"
+            f.write(line + "\n")
 
 @app.route("/logout")
 def logout():
