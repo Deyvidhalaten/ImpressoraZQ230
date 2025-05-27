@@ -5,4 +5,7 @@ pip install requests                  # para chamadas HTTP (bwip-js, se usar)
 pip install pillow                    # manipulação de imagens
 pip install python-barcode[images]    # gera EAN-13 como PNG
 pip install pywin32                   # impressão via driver no Windows
-python app.py
+pip install waitress
+
+waitress-serve --listen=10.4.30.2:8000 app:app #Rodar Servidor em LAN
+python app.py  # Roda Localmente 

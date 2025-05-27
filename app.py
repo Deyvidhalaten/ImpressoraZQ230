@@ -498,23 +498,27 @@ def login():
 @app.route("/printers", methods=["GET","POST"])
 def printers():
     mappings = load_printer_map()
-    # Ordenamento do menor para o maior
     mappings.sort(key=lambda m: int(m['loja'] or 0))
+
     if request.method == "POST":
-        # pega valores do form
+        # ——— Tratar exclusão primeiro ———
+        if request.form.get("action") == "delete":
+            pattern_to_delete = request.form.get("pattern")
+            mappings = [m for m in mappings if m["pattern"] != pattern_to_delete]
+            save_printer_map(mappings)
+            flash(f"🗑️ Mapeamento '{pattern_to_delete}' excluído com sucesso!", "success")
+            return redirect(url_for("printers"))
+
+        # ——— A seguir, inclusão/edição como antes ———
         loja   = request.form.get('loja','').strip()
         driver = request.form.get('driver','').strip()
         funcao = request.form.get('funcao','').strip()
 
-        # validação mínima
         if not loja.isdigit() or not driver:
             flash("❌ Loja e driver são obrigatórios", "error")
             return redirect(url_for('printers'))
 
-        # constrói o padrão "10.<loja>*"
         pattern = f"10.{int(loja)}*"
-
-        # substitui se já existir, ou adiciona novo
         updated = False
         for m in mappings:
             if m['pattern'] == pattern:
@@ -530,12 +534,11 @@ def printers():
                 'funcao': funcao
             })
 
-        # grava o arquivo e dá feedback
         save_printer_map(mappings)
         flash("✅ Mapeamento salvo com sucesso!", "success")
         return redirect(url_for('printers'))
 
-    # GET: renderiza a tabela
+    # GET: renderiza a página normalmente
     return render_template("printers.html", mappings=mappings)
 
 def save_printer_map(mappings):
@@ -593,4 +596,5 @@ def settings():
     )
 
 if __name__ == "__main__":
-    app.run(debug=False, use_reloader=False)
+    # host='0.0.0.0' faz o Flask aceitar conexões de qualquer IP da sua LAN
+    app.run(host="10.4.30.2", port=8000, debug=False, use_reloader=False)

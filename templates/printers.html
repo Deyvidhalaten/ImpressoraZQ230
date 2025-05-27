@@ -6,16 +6,33 @@
   <title>Configurar Drivers de Impressora</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <style>
-    .action-btn {
-      margin: 0 20px;
-      padding: 4px 8px;
+    /* full‐width, auto‐sized table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
     }
-    th.actions, td.actions {
-      min-width: 120px;
-      text-align: center;
+    th, td {
+      padding: 12px;
+      border-bottom: 1px solid #ccc;
+      text-align: left;
     }
-    table th, table td {
-      padding: 10px 12px;
+    /* let these two columns expand to fit content */
+    col.driver-col,
+    col.funcao-col {
+      /* no fixed width: auto will size to content */
+      width: auto;
+    }
+    td.driver-col,
+    td.funcao-col {
+      white-space: nowrap;        /* prevent wrapping */
+      overflow-x: auto;           /* allow horizontal scroll if really long */
+    }
+    /* make form inputs stretch full width */
+    form#printers-form input {
+      width: 100%;
+      box-sizing: border-box;
+      margin: 6px 0 14px;
+      padding: 8px;
     }
   </style>
 </head>
@@ -30,49 +47,81 @@
 
     <h1>Mapeamento de Impressoras</h1>
 
+    <!-- feedback -->
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for cat, msg in messages %}
         <div class="{{ 'flash-success' if cat=='success' else 'flash' }}">{{ msg }}</div>
       {% endfor %}
     {% endwith %}
 
-    <table style="width:100%; margin-bottom:20px; border-collapse: collapse;">
-     <thead>
-  <tr>
-    <th>Loja</th><th>Driver</th><th>Função</th><th>Ações</th>
-  </tr>
-</thead>
-<tbody>
-{% for m in mappings %}
-  <tr>
-    <form method="POST" action="{{ url_for('printers') }}">
-      <td>
-        <input type="number" name="loja" value="{{ m.loja }}" min="1" style="width:4em">
-      </td>
-      <td>
-        <input type="text" name="driver" value="{{ m.driver }}">
-      </td>
-      <td>
-        <input type="text" name="funcao" value="{{ m.funcao }}">
-      </td>
-      <td>
-        <input type="hidden" name="pattern" value="{{ m.pattern }}">
-        <button type="submit" name="action" value="save">💾</button>
-        <button type="submit" name="action" value="delete">❌</button>
-      </td>
+    <!-- colgroup para controle de largura -->
+    <table>
+      <colgroup>
+        <col style="width:10%;">
+        <col style="width:20%;">
+        <col class="driver-col">
+        <col class="funcao-col">
+        <col style="width:10%;"> <!-- coluna Ações fixa -->
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Loja</th>
+          <th>Padrão IP</th>
+          <th>Driver</th>
+          <th>Função</th>
+          <th>Ações</th>          <!-- nova coluna -->
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in mappings %}
+        <tr>
+          <td>{{ m.loja }}</td>
+          <td>{{ m.pattern }}</td>
+          <td class="driver-col">{{ m.driver }}</td>
+          <td class="funcao-col">{{ m.funcao or '—' }}</td>
+          <td>
+            <form method="post"
+                  style="display:inline"
+                  onsubmit="return confirmDelete(this)">
+              <!-- sinaliza que é uma ação de delete -->
+              <input type="hidden" name="action"  value="delete">
+              <input type="hidden" name="pattern" value="{{ m.pattern }}">
+              <button type="submit"
+                      style="background:none;
+                             border:none;
+                             cursor:pointer;
+                             font-size:1.2em;"
+                      title="Excluir">
+                🗑️
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" style="text-align:center; padding:16px;">
+            Nenhum mapeamento cadastrado.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- formulário de inclusão/edição -->
+    <form id="printers-form" method="POST" action="{{ url_for('printers') }}">
+      <label for="loja">Loja (número):</label>
+      <input type="number" id="loja" name="loja" min="1" max="32" required>
+
+      <label for="driver">Nome do Driver:</label>
+      <input type="text" id="driver" name="driver"
+             required placeholder="Ex: ZD230-203dpi.floricultura">
+
+      <label for="funcao">Função (opcional):</label>
+      <input type="text" id="funcao" name="funcao"
+             placeholder="Ex: Floricultura">
+
+      <button type="submit">Salvar Mapeamento</button>
     </form>
-  </tr>
-{% endfor %}
-<!-- E um formulário extra para “+ Nova impressora” -->
-<tr>
-  <form method="POST" action="{{ url_for('printers') }}">
-    <td><input type="number" name="loja" min="1" placeholder="nova"></td>
-    <td><input type="text" name="driver" placeholder="driver"></td>
-    <td><input type="text" name="funcao" placeholder="função"></td>
-    <td><button type="submit" name="action" value="save">➕</button></td>
-  </form>
-</tr>
-</tbody>
 
   </div>
 </body>
