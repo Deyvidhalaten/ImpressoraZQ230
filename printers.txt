@@ -1,7 +1,4 @@
-10.4*,ZD230-203dpi.floricultura04,floricultura,-20,0
-10.5*,ZD230-203dpi.floricultura05,floricultura,-120,-20
-10.4*,ZD230-203dpi.floricultura04,floricultura,-120,-20
-10.5*,ZD230-203dpi.floricultura05,floricultura,-120,-20
-10.9*,ZD230-203dpi.floricultura09,Floricultura,-120,-20
-10.17*,ZD230-203dpi.floricultura17,FLoricultura,-120,-20
-10.23*,ZD230-203dpi.floricultura23,Floricultura,-120,-20
+loja,pattern,driver,funcao,ls_flor,ls_flv
+4,10.4*,ZD230-203dpi.floricultura04,floricultura,-20,0
+5,10.5*,ZD230-203dpi.floricultura05,floricultura,-120,-20
+9,10.9*,ZD230-203dpi.floricultura09,floricultura,-20,-10

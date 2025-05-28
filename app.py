@@ -26,6 +26,7 @@ font = ImageFont.truetype(windows_font, size=14)
 BASE_DIR     = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
 CONFIG_FILE  = os.path.join(BASE_DIR, 'config.txt')
 CSV_FILE     = os.path.join(BASE_DIR, 'baseFloricultura.csv')
+PRINTERS_CSV = os.path.join(BASE_DIR, 'printers.csv')
 
 DEFAULT_IP       = "10.17.30.119"
 DEFAULT_PORTA    = 9100
@@ -57,31 +58,25 @@ def load_db():
             db[codprod] = {'ean': ean, 'descricao': desc, 'codprod': codprod}
     return db
 
-PRINTERS_FILE = os.path.join(BASE_DIR, 'printers.txt')
 def load_printer_map():
-    """Lê o printers.txt e retorna uma lista de dicts: [{'pattern','driver','loja','funcao'}, ...]"""
+    """Lê o printers.csv e retorna lista de mapeamentos."""
     maps = []
-    if not os.path.exists(PRINTERS_FILE):
+    if not os.path.exists(PRINTERS_CSV):
         return maps
-    with open(PRINTERS_FILE, encoding='utf-8') as f:
-        for line in f:
-            parts = [p.strip() for p in line.split(',')]
-            if len(parts) < 2:
-                continue
-            pattern, driver = parts[0], parts[1]
-            funcao = parts[2] if len(parts) >= 3 else ''
-            # extrai apenas o número da loja do padrão "10.<loja>*"
-            try:
-                loja = pattern.split('.')[1].rstrip('*')
-            except:
-                loja = ''
+
+    with open(PRINTERS_CSV, newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
             maps.append({
-                'pattern': pattern,
-                'driver': driver,
-                'loja': loja,
-                'funcao': funcao
+                'loja':    row.get('loja',''),
+                'pattern': row.get('pattern',''),
+                'driver':  row.get('driver',''),
+                'funcao':  row.get('funcao',''),
+                'ls_flor': int(row.get('ls_flor', 0)),
+                'ls_flv':  int(row.get('ls_flv', 0)),
             })
     return maps
+
 
 # logo após definir BASE_DIR:
 load_printer_map()
@@ -497,28 +492,35 @@ def login():
 
 @app.route("/printers", methods=["GET","POST"])
 def printers():
+    # 1) Carrega e ordena os mapeamentos por loja
     mappings = load_printer_map()
-    mappings.sort(key=lambda m: int(m['loja'] or 0))
+    mappings.sort(key=lambda m: int(m.get('loja', 0)))
 
     if request.method == "POST":
-        # ——— Tratar exclusão primeiro ———
-        if request.form.get("action") == "delete":
+        action = request.form.get("action")
+
+        # ——— Tratamento de EXCLUSÃO ———
+        if action == "delete":
             pattern_to_delete = request.form.get("pattern")
             mappings = [m for m in mappings if m["pattern"] != pattern_to_delete]
             save_printer_map(mappings)
             flash(f"🗑️ Mapeamento '{pattern_to_delete}' excluído com sucesso!", "success")
             return redirect(url_for("printers"))
 
-        # ——— A seguir, inclusão/edição como antes ———
-        loja   = request.form.get('loja','').strip()
-        driver = request.form.get('driver','').strip()
-        funcao = request.form.get('funcao','').strip()
+        # ——— Tratamento de INCLUSÃO / EDIÇÃO ———
+        loja   = request.form.get('loja', '').strip()
+        driver = request.form.get('driver', '').strip()
+        funcao = request.form.get('funcao', '').strip()
 
+        # validação mínima
         if not loja.isdigit() or not driver:
             flash("❌ Loja e driver são obrigatórios", "error")
             return redirect(url_for('printers'))
 
+        # monta o padrão "10.<loja>*"
         pattern = f"10.{int(loja)}*"
+
+        # tenta atualizar um mapeamento existente
         updated = False
         for m in mappings:
             if m['pattern'] == pattern:
@@ -526,29 +528,39 @@ def printers():
                 m['funcao'] = funcao
                 updated = True
                 break
+
+        # se não havia, adiciona novo
         if not updated:
             mappings.append({
+                'loja':    loja,
                 'pattern': pattern,
-                'driver': driver,
-                'loja': loja,
-                'funcao': funcao
+                'driver':  driver,
+                'funcao':  funcao
             })
 
+        # persiste e notifica
         save_printer_map(mappings)
         flash("✅ Mapeamento salvo com sucesso!", "success")
         return redirect(url_for('printers'))
 
-    # GET: renderiza a página normalmente
+    # GET: renderiza a página com a lista atualizada
     return render_template("printers.html", mappings=mappings)
 
 def save_printer_map(mappings):
-    """Recebe lista de dicts e grava de volta no printers.txt"""
-    with open(PRINTERS_FILE, 'w', encoding='utf-8') as f:
+    """Grava de volta no printers.csv."""
+    fieldnames = ['loja','pattern','driver','funcao','ls_flor','ls_flv']
+    with open(PRINTERS_CSV, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
         for m in mappings:
-            line = f"{m['pattern']},{m['driver']}"
-            if m.get('funcao'):
-                line += f",{m['funcao']}"
-            f.write(line + "\n")
+            writer.writerow({
+                'loja':    m['loja'],
+                'pattern': m['pattern'],
+                'driver':  m['driver'],
+                'funcao':  m.get('funcao',''),
+                'ls_flor': m.get('ls_flor', 0),
+                'ls_flv':  m.get('ls_flv', 0),
+            })
 
 @app.route("/logout")
 def logout():
@@ -597,4 +609,4 @@ def settings():
 
 if __name__ == "__main__":
     # host='0.0.0.0' faz o Flask aceitar conexões de qualquer IP da sua LAN
-    app.run(host="10.4.30.2", port=8000, debug=False, use_reloader=False)
+    app.run(host="10.17.30.2", port=8000, debug=False, use_reloader=False)

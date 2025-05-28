@@ -55,57 +55,44 @@
     {% endwith %}
 
     <!-- colgroup para controle de largura -->
-    <table>
-      <colgroup>
-        <col style="width:10%;">
-        <col style="width:20%;">
-        <col class="driver-col">
-        <col class="funcao-col">
-        <col style="width:10%;"> <!-- coluna Ações fixa -->
-      </colgroup>
-      <thead>
-        <tr>
-          <th>Loja</th>
-          <th>Padrão IP</th>
-          <th>Driver</th>
-          <th>Função</th>
-          <th>Ações</th>          <!-- nova coluna -->
-        </tr>
-      </thead>
-      <tbody>
-        {% for m in mappings %}
-        <tr>
-          <td>{{ m.loja }}</td>
-          <td>{{ m.pattern }}</td>
-          <td class="driver-col">{{ m.driver }}</td>
-          <td class="funcao-col">{{ m.funcao or '—' }}</td>
-          <td>
-            <form method="post"
-                  style="display:inline"
-                  onsubmit="return confirmDelete(this)">
-              <!-- sinaliza que é uma ação de delete -->
-              <input type="hidden" name="action"  value="delete">
-              <input type="hidden" name="pattern" value="{{ m.pattern }}">
-              <button type="submit"
-                      style="background:none;
-                             border:none;
-                             cursor:pointer;
-                             font-size:1.2em;"
-                      title="Excluir">
-                🗑️
-              </button>
-            </form>
-          </td>
-        </tr>
-        {% else %}
-        <tr>
-          <td colspan="5" style="text-align:center; padding:16px;">
-            Nenhum mapeamento cadastrado.
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+   <table class="map-table">
+  <thead>
+    <tr>
+      <th>Loja</th>
+      <th>Padrão IP</th>
+      <th>Driver</th>
+      <th>Função</th>
+      <th>LS Flor</th>
+      <th>LS FLV</th>
+      <th>Ações</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for m in mappings %}
+    <tr>
+      <td>{{ m.loja }}</td>
+      <td>{{ m.pattern }}</td>
+      <td>{{ m.driver }}</td>
+      <td>{{ m.funcao or '—' }}</td>
+      <td>{{ m.ls_flor }}</td>
+      <td>{{ m.ls_flv }}</td>
+      <td>
+        <!-- Form de delete -->
+        <form method="POST" style="display:inline"
+              onsubmit="return confirm('Deseja mesmo excluir o mapeamento da loja {{ m.loja }}?');">
+          <input type="hidden" name="action" value="delete">
+          <input type="hidden" name="pattern" value="{{ m.pattern }}">
+          <button type="submit" class="btn-delete">Excluir</button>
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr>
+      <td colspan="7" class="no-data">Nenhum mapeamento cadastrado.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
 
     <!-- formulário de inclusão/edição -->
     <form id="printers-form" method="POST" action="{{ url_for('printers') }}">
