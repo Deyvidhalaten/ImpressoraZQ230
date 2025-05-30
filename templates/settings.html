@@ -30,8 +30,6 @@
 
     <h1>Configurar Impressora</h1>
     <form method="POST" action="{{ url_for('settings') }}">
-      <label for="ip">Novo IP da Impressora:</label>
-      <input type="text" id="ip" name="ip" value="{{ ip_impressora }}" required>
 
       <label for="ls_flor">LS Manual Floricultura:</label>
       <input type="number" id="ls_flor" name="ls_flor" value="{{ ls_flor }}" required>

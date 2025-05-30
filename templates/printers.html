@@ -55,13 +55,14 @@
     {% endwith %}
 
     <!-- colgroup para controle de largura -->
-   <table class="map-table">
+  <table>
   <thead>
     <tr>
       <th>Loja</th>
       <th>Padrão IP</th>
       <th>Driver</th>
       <th>Função</th>
+      <th>IP da Impressora</th>
       <th>LS Flor</th>
       <th>LS FLV</th>
       <th>Ações</th>
@@ -74,41 +75,43 @@
       <td>{{ m.pattern }}</td>
       <td>{{ m.driver }}</td>
       <td>{{ m.funcao or '—' }}</td>
+      <td>{{ m.ip or '—' }}</td>
       <td>{{ m.ls_flor }}</td>
       <td>{{ m.ls_flv }}</td>
       <td>
-        <!-- Form de delete -->
-        <form method="POST" style="display:inline"
-              onsubmit="return confirm('Deseja mesmo excluir o mapeamento da loja {{ m.loja }}?');">
+        <form method="POST" style="display:inline">
           <input type="hidden" name="action" value="delete">
           <input type="hidden" name="pattern" value="{{ m.pattern }}">
-          <button type="submit" class="btn-delete">Excluir</button>
+          <button type="submit" onclick="return confirm('Confirma exclusão?')">Excluir</button>
         </form>
       </td>
-    </tr>
-    {% else %}
-    <tr>
-      <td colspan="7" class="no-data">Nenhum mapeamento cadastrado.</td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
 
-    <!-- formulário de inclusão/edição -->
-    <form id="printers-form" method="POST" action="{{ url_for('printers') }}">
-      <label for="loja">Loja (número):</label>
-      <input type="number" id="loja" name="loja" min="1" max="32" required>
+<!-- No formulário de inclusão/edição, adicione campo de IP e LS -->
+<form method="POST">
+  <label>Loja:</label>
+  <input name="loja" type="number" min="1" max="99" required>
 
-      <label for="driver">Nome do Driver:</label>
-      <input type="text" id="driver" name="driver"
-             required placeholder="Ex: ZD230-203dpi.floricultura">
+  <label>Driver:</label>
+  <input name="driver" type="text" required>
 
-      <label for="funcao">Função (opcional):</label>
-      <input type="text" id="funcao" name="funcao"
-             placeholder="Ex: Floricultura">
+  <label>Função:</label>
+  <input name="funcao" type="text">
 
-      <button type="submit">Salvar Mapeamento</button>
-    </form>
+  <label>IP da Impressora:</label>
+  <input name="ip" type="text" placeholder="Ex: 10.4.30.116" required>
+
+  <label>LS Flor:</label>
+  <input name="ls_flor" type="number" value="0" required>
+
+  <label>LS FLV:</label>
+  <input name="ls_flv" type="number" value="0" required>
+
+  <button type="submit">Salvar</button>
+</form>
 
   </div>
 </body>

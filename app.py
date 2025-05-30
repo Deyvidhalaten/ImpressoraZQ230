@@ -59,28 +59,45 @@ def load_db():
     return db
 
 def load_printer_map():
-    """Lê o printers.csv e retorna lista de mapeamentos."""
     maps = []
     if not os.path.exists(PRINTERS_CSV):
         return maps
-
     with open(PRINTERS_CSV, newline='', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
             maps.append({
-                'loja':    row.get('loja',''),
-                'pattern': row.get('pattern',''),
-                'driver':  row.get('driver',''),
+                'loja':    row['loja'],
+                'pattern': row['pattern'],
+                'driver':  row['driver'],
                 'funcao':  row.get('funcao',''),
+                'ip':      row.get('ip',''),
                 'ls_flor': int(row.get('ls_flor', 0)),
                 'ls_flv':  int(row.get('ls_flv', 0)),
             })
     return maps
 
 
-# logo após definir BASE_DIR:
 load_printer_map()
 
+def get_mapping_for_ip(client_ip, mappings):
+    """Retorna o mapeamento cuja pattern case com o client_ip."""
+    for m in mappings:
+        prefix = m['pattern'].rstrip('*')
+        if client_ip.startswith(prefix):
+            return m
+    return None
+
+def enviar_para_impressora_ip(zpl: str, ip: str, porta: int = PORTA_IMPRESSORA) -> bool:
+    """Envia diretamente via socket ZPL ao IP/porta informados."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((ip, porta))
+            s.sendall(zpl.encode('latin1'))
+        return True
+    except Exception as e:
+        print("Erro ao enviar ZPL por IP:", e)
+        return False
+    
 def load_config():
     global IP_IMPRESSORA, LS_FLOR_VALUE, LS_FLV_VALUE
     if not os.path.exists(CONFIG_FILE):
@@ -397,40 +414,53 @@ Y_OFFSET = 50  # fixo vertical
 # --- Rota principal ---
 @app.route("/", methods=["GET","POST"])
 def index():
-    mappings = load_printer_map()            # lê printers.txt
-    client_ip = request.remote_addr          # IP de quem chamou
-    driver_for_request = get_driver_for_ip(client_ip, mappings)
-    if request.method == "POST":
-        codigo = request.form.get("codigo","").strip()
-        modo   = request.form.get("modo","Floricultura")
-        action = request.form.get("action","print")
+    # Carrega todos os mapeamentos do CSV
+    mappings = load_printer_map()
+    client_ip = request.remote_addr
+    # Encontra o mapeamento que casa com o IP do cliente
+    mapping = get_mapping_for_ip(client_ip, mappings) or {}
 
-        # Carregar LS permanentemente
+    # Se não achar, cai em defaults
+    driver_for_request = mapping.get('driver') or win32print.GetDefaultPrinter()
+    printer_ip         = mapping.get('printer_ip') or IP_IMPRESSORA
+    ls_flor_mapped     = mapping.get('ls_flor', LS_FLOR_VALUE)
+    ls_flv_mapped      = mapping.get('ls_flv',  LS_FLV_VALUE)
+
+    if request.method == "POST":
+        codigo = request.form.get("codigo", "").strip()
+        modo   = request.form.get("modo",   "Floricultura")
+        action = request.form.get("action", "print")
+
+        # --- Ação de "Enviar Carga" (LS ZPL) ---
         if action == "load":
-            ls = LS_FLOR_VALUE if modo=="Floricultura" else LS_FLV_VALUE
-            disable_reset_and_set_ls(ls_value=ls)
-            flash(f"✅ Carga '{modo}' (LS={ls}) enviada!","success")
+            ls = ls_flor_mapped if modo == "Floricultura" else ls_flv_mapped
+            zpl = f"^XA\n^MD30\n^LS{ls}\n^XZ"
+            ok  = enviar_para_impressora_ip(zpl, printer_ip)
+            if ok:
+                flash(f"✅ Carga '{modo}' (LS={ls}) enviada para {printer_ip}!", "success")
+            else:
+                flash(f"❌ Falha ao enviar carga para {printer_ip}", "error")
             return redirect(url_for("index"))
 
-        # Impressão
+        # --- Ação de "Imprimir" via driver Windows/GDI ---
         if action == "print":
-            # ler/limitar cópias
+            # lê e valida número de cópias
             try:
-                copies = int(request.form.get("copies","1"))
+                copies = int(request.form.get("copies", "1"))
             except ValueError:
                 copies = 1
             copies = max(1, min(copies, 100))
 
             if modo == "FLV":
-                flash("❌ Impressão desabilitada em modo FLV","error")
+                flash("❌ Impressão desabilitada em modo FLV", "error")
                 return redirect(url_for("index"))
 
             if not validou_codigo(codigo):
-                flash("❌ Produto não encontrado","error")
+                flash("❌ Produto não encontrado", "error")
                 return redirect(url_for("index"))
 
-            # tira sufixo "-X" antes da busca
-            chave_base = codigo.split("-",1)[0]
+            # busca no DB
+            chave_base = codigo.split("-", 1)[0]
             if len(chave_base) == 13:
                 rec = DB.get(chave_base)
             else:
@@ -438,31 +468,32 @@ def index():
                     (v for v in DB.values() if v['codprod'].startswith(chave_base)),
                     None
                 )
-
             if not rec:
-                flash("❌ Produto não encontrado","error")
+                flash("❌ Produto não encontrado", "error")
                 return redirect(url_for("index"))
 
-            # geração única dos arquivos
+            # gera imagens
             raw    = gerar_barcode_bwip(rec['ean'])
             single = compose_label(raw, rec['descricao'], rec['codprod'])
-            double = compose_double_label(single)  # imagem com 2 etiquetas lado a lado
+            double = compose_double_label(single)
 
-            xoff = abs(LS_FLOR_VALUE)
+            # escolhe LS para deslocamento
+            ls = ls_flor_mapped if modo == "Floricultura" else ls_flv_mapped
+            xoff = abs(ls)
 
             try:
-                # reenvia LS antes de imprimir
-                disable_reset_and_set_ls(ls_value=xoff)
+                # reaplica LS no driver antes de imprimir
+                disable_reset_and_set_ls(ls_value=ls, printer_name=driver_for_request)
 
-                # imprime 'copies' vezes
+                # imprime as cópias
                 for _ in range(copies):
                     print_image_via_driver(double, xoff, printer_name=driver_for_request)
 
-                flash(f"✅ {copies} cópia(s) impressa(s) com sucesso!", "success")
+                flash(f"✅ {copies} cópia(s) impressa(s) via driver '{driver_for_request}'", "success")
             except Exception as e:
                 flash(f"❌ Erro ao imprimir: {e}", "error")
             finally:
-                # cleanup
+                # limpa arquivos temporários
                 for path in (raw, single, double):
                     if path and os.path.exists(path):
                         os.remove(path)
@@ -470,6 +501,7 @@ def index():
             return redirect(url_for("index"))
 
     return render_template("index.html")
+
 def send_ls_config(modo: str):
     """Envia o ^LS configurado na impressora para preservar a margem."""
     ls = LS_FLOR_VALUE if modo == 'Floricultura' else LS_FLV_VALUE
@@ -492,63 +524,52 @@ def login():
 
 @app.route("/printers", methods=["GET","POST"])
 def printers():
-    # 1) Carrega e ordena os mapeamentos por loja
     mappings = load_printer_map()
-    mappings.sort(key=lambda m: int(m.get('loja', 0)))
+    mappings.sort(key=lambda m: int(m['loja'] or 0))
 
     if request.method == "POST":
-        action = request.form.get("action")
-
-        # ——— Tratamento de EXCLUSÃO ———
-        if action == "delete":
-            pattern_to_delete = request.form.get("pattern")
-            mappings = [m for m in mappings if m["pattern"] != pattern_to_delete]
+        # DELETE
+        if request.form.get("action") == "delete":
+            pattern = request.form["pattern"]
+            mappings = [m for m in mappings if m["pattern"] != pattern]
             save_printer_map(mappings)
-            flash(f"🗑️ Mapeamento '{pattern_to_delete}' excluído com sucesso!", "success")
+            flash("🗑️ Mapeamento excluído!", "success")
             return redirect(url_for("printers"))
 
-        # ——— Tratamento de INCLUSÃO / EDIÇÃO ———
-        loja   = request.form.get('loja', '').strip()
-        driver = request.form.get('driver', '').strip()
-        funcao = request.form.get('funcao', '').strip()
+        # ADD / EDIT
+        loja   = request.form['loja'].strip()
+        driver = request.form['driver'].strip()
+        funcao = request.form.get('funcao','').strip()
+        ip     = request.form['ip'].strip()
+        ls_f   = int(request.form.get('ls_flor', 0))
+        ls_v   = int(request.form.get('ls_flv', 0))
 
-        # validação mínima
-        if not loja.isdigit() or not driver:
-            flash("❌ Loja e driver são obrigatórios", "error")
-            return redirect(url_for('printers'))
-
-        # monta o padrão "10.<loja>*"
         pattern = f"10.{int(loja)}*"
-
-        # tenta atualizar um mapeamento existente
         updated = False
         for m in mappings:
             if m['pattern'] == pattern:
-                m['driver'] = driver
-                m['funcao'] = funcao
+                m.update(driver=driver, funcao=funcao, ip=ip, ls_flor=ls_f, ls_flv=ls_v)
                 updated = True
                 break
-
-        # se não havia, adiciona novo
         if not updated:
             mappings.append({
                 'loja':    loja,
                 'pattern': pattern,
                 'driver':  driver,
-                'funcao':  funcao
+                'funcao':  funcao,
+                'ip':      ip,
+                'ls_flor': ls_f,
+                'ls_flv':  ls_v,
             })
 
-        # persiste e notifica
         save_printer_map(mappings)
-        flash("✅ Mapeamento salvo com sucesso!", "success")
-        return redirect(url_for('printers'))
+        flash("✅ Mapeamento salvo!", "success")
+        return redirect(url_for("printers"))
 
-    # GET: renderiza a página com a lista atualizada
     return render_template("printers.html", mappings=mappings)
 
 def save_printer_map(mappings):
-    """Grava de volta no printers.csv."""
-    fieldnames = ['loja','pattern','driver','funcao','ls_flor','ls_flv']
+    fieldnames = ['loja','pattern','driver','funcao','ip','ls_flor','ls_flv']
     with open(PRINTERS_CSV, 'w', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -558,8 +579,9 @@ def save_printer_map(mappings):
                 'pattern': m['pattern'],
                 'driver':  m['driver'],
                 'funcao':  m.get('funcao',''),
-                'ls_flor': m.get('ls_flor', 0),
-                'ls_flv':  m.get('ls_flv', 0),
+                'ip':      m.get('ip',''),
+                'ls_flor': m.get('ls_flor',0),
+                'ls_flv':  m.get('ls_flv',0),
             })
 
 @app.route("/logout")
@@ -609,4 +631,4 @@ def settings():
 
 if __name__ == "__main__":
     # host='0.0.0.0' faz o Flask aceitar conexões de qualquer IP da sua LAN
-    app.run(host="10.17.30.2", port=8000, debug=False, use_reloader=False)
+    app.run(host="10.4.30.2", port=8000, debug=False, use_reloader=False)
