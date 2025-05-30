@@ -421,100 +421,94 @@ Y_OFFSET = 50  # fixo vertical
 # --- Rota principal ---
 @app.route("/", methods=["GET","POST"])
 def index():
-    # Carrega todos os mapeamentos do CSV
-    mappings = load_printer_map()
-    client_ip = request.remote_addr
-    # Encontra o mapeamento que casa com o IP do cliente
-    mapping = get_mapping_for_ip(client_ip, mappings) or {}
-
-    # Se não achar, cai em defaults
-    driver_for_request = mapping.get('driver') or win32print.GetDefaultPrinter()
-    printer_ip         = mapping.get('printer_ip') or IP_IMPRESSORA
-    ls_flor_mapped     = mapping.get('ls_flor', LS_FLOR_VALUE)
-    ls_flv_mapped      = mapping.get('ls_flv',  LS_FLV_VALUE)
-
     if request.method == "POST":
-        codigo = request.form.get("codigo", "").strip()
-        modo   = request.form.get("modo",   "Floricultura")
-        action = request.form.get("action", "print")
-        
-        # --- Ação de "Enviar Carga" (LS ZPL) ---
-        if action == "load":
-            loja_map = get_loja_map()
-            if loja_map is None:
-                flash("❌ Sua loja não está cadastrada. Acesse “Impressoras” para adicioná-la.", "error")
-                return redirect(url_for("index"))
-            
-            ls = ls_flor_mapped if modo == "Floricultura" else ls_flv_mapped
-            zpl = f"^XA\n^MD30\n^LS{ls}\n^XZ"
-            ok  = enviar_para_impressora_ip(zpl, printer_ip)
-            if ok:
-                flash(f"✅ Carga '{modo}' (LS={ls}) enviada para {printer_ip}!", "success")
-            else:
-                flash(f"❌ Falha ao enviar carga para {printer_ip}", "error")
-            return redirect(url_for("index"))
+        codigo = request.form.get("codigo","").strip()
+        modo   = request.form.get("modo","Floricultura")
+        action = request.form.get("action","print")
 
-        # --- Ação de "Imprimir" via driver Windows/GDI ---
+        # --- Identifica qual mapeamento (loja) corresponde ao IP solicitante ---
+        mappings  = load_printer_map()
+        client_ip = request.remote_addr
+        loja_map  = next(
+            (m for m in mappings if client_ip.startswith(f"10.{m['loja']}.") ),
+            None
+        )
+
+        # --- Se não estiver cadastrado, avisa e não faz nada além disso ---
+        if loja_map is None:
+            flash("❌ Loja não cadastrada — contate o administrador.", "error")
+            return render_template("index.html")
+
+        # extrai driver e margens configuradas para esta loja
+        driver_for_request = loja_map.get("driver")
+        ls_flor = loja_map.get("ls_flor", DEFAULT_LS_FLOR)
+        ls_flv  = loja_map.get("ls_flv",  DEFAULT_LS_FLV)
+
+        # --- Carregar carga via ZPL ---
+        if action == "load":
+            ls = ls_flor if modo=="Floricultura" else ls_flv
+            disable_reset_and_set_ls(ls_value=ls, printer_name=driver_for_request)
+            flash(f"✅ Carga '{modo}' (LS={ls}) enviada!", "success")
+            return render_template("index.html")
+
+        # --- Imprimir via driver Windows/GDI ---
         if action == "print":
-            if loja_map is None:
-              flash("❌ Sua loja não está cadastrada. Acesse “Impressoras” para adicioná-la.", "error")
-              return redirect(url_for("index"))
+            # se o driver não existir, avisa e sai
+            if not driver_for_request:
+                flash("❌ Nenhum driver configurado para sua loja.", "error")
+                return render_template("index.html")
+
             # lê e valida número de cópias
             try:
-                copies = int(request.form.get("copies", "1"))
+                copies = int(request.form.get("copies","1"))
             except ValueError:
                 copies = 1
             copies = max(1, min(copies, 100))
 
             if modo == "FLV":
                 flash("❌ Impressão desabilitada em modo FLV", "error")
-                return redirect(url_for("index"))
+                return render_template("index.html")
 
             if not validou_codigo(codigo):
                 flash("❌ Produto não encontrado", "error")
-                return redirect(url_for("index"))
+                return render_template("index.html")
 
             # busca no DB
-            chave_base = codigo.split("-", 1)[0]
-            if len(chave_base) == 13:
-                rec = DB.get(chave_base)
+            chave = codigo.split("-",1)[0]
+            if len(chave) == 13:
+                rec = DB.get(chave)
             else:
-                rec = next(
-                    (v for v in DB.values() if v['codprod'].startswith(chave_base)),
-                    None
-                )
+                rec = next((v for v in DB.values() if v['codprod'].startswith(chave)), None)
+
             if not rec:
                 flash("❌ Produto não encontrado", "error")
-                return redirect(url_for("index"))
+                return render_template("index.html")
 
             # gera imagens
             raw    = gerar_barcode_bwip(rec['ean'])
             single = compose_label(raw, rec['descricao'], rec['codprod'])
             double = compose_double_label(single)
 
-            # escolhe LS para deslocamento
-            ls = ls_flor_mapped if modo == "Floricultura" else ls_flv_mapped
-            xoff = abs(ls)
+            # escolhe margem e offset
+            ls   = ls_flor if modo=="Floricultura" else ls_flv
+            xoff = ls
 
             try:
-                # reaplica LS no driver antes de imprimir
                 disable_reset_and_set_ls(ls_value=ls, printer_name=driver_for_request)
-
-                # imprime as cópias
                 for _ in range(copies):
                     print_image_via_driver(double, xoff, printer_name=driver_for_request)
-
-                flash(f"✅ {copies} cópia(s) impressa(s) via driver '{driver_for_request}'", "success")
+                    disable_reset_and_set_ls(ls_value=ls, printer_name=driver_for_request)
+                flash(f"✅ {copies} cópia(s) impressa(s) via '{driver_for_request}'", "success")
             except Exception as e:
                 flash(f"❌ Erro ao imprimir: {e}", "error")
             finally:
-                # limpa arquivos temporários
-                for path in (raw, single, double):
-                    if path and os.path.exists(path):
-                        os.remove(path)
+                for p in (raw, single, double):
+                    if p and os.path.exists(p):
+                        os.remove(p)
 
-            return redirect(url_for("index"))
+            return render_template("index.html")
 
+    # rota GET: apenas exibe o formulário, sem checar nada
     return render_template("index.html")
 
 def send_ls_config(modo: str):
@@ -605,31 +599,57 @@ def logout():
     flash("✅ Logout realizado!", "success")
     return redirect(url_for('index'))
 
-@app.route("/settings", methods=["GET","POST"])
+@app.route("/settings", methods=["GET", "POST"])
 def settings():
-    global LS_FLOR_VALUE, LS_FLV_VALUE
+    # 1) só pode quem estiver logado
+    if not session.get("logged_in"):
+        return redirect(url_for("login", next=url_for("settings")))
+
+    # 2) carrega todos os mapeamentos
+    mappings   = load_printer_map()
+    client_ip  = request.remote_addr
+    # 3) encontra o registro da loja correspondente ao IP
+    loja_map = next(
+        (m for m in mappings if client_ip.startswith(f"10.{m['loja']}.")),
+        None
+    )
 
     if request.method == "POST":
-        # pega os novos valores de LS direto do form
-        ls_f = request.form.get('ls_flor','').strip()
-        ls_v = request.form.get('ls_flv','').strip()
-
+        # 4) pega os novos valores enviados
         try:
-            LS_FLOR_VALUE = int(ls_f)
-            LS_FLV_VALUE  = int(ls_v)
-            save_printer_map(load_printer_map())  # ou save_config() se mantiver config.txt
-            flash("✅ LS atualizados com sucesso!", "success")
-        except ValueError:
+            novo_ls_flor = int(request.form["ls_flor"])
+            novo_ls_flv  = int(request.form["ls_flv"])
+        except (KeyError, ValueError):
             flash("❌ Valores inválidos para LS", "error")
-        return redirect(url_for('settings'))
+            return redirect(url_for("settings"))
 
-    # Renderiza o form mostrando os LS que estão no CSV
+        if loja_map:
+            # 5) atualiza apenas esse registro
+            loja_map["ls_flor"] = novo_ls_flor
+            loja_map["ls_flv"]  = novo_ls_flv
+            # 6) grava tudo de volta
+            save_printer_map(mappings)
+            flash("✅ LS atualizados com sucesso!", "success")
+        else:
+            flash("❌ Sua loja não está cadastrada para ajustes de margem.", "error")
+
+        return redirect(url_for("settings"))
+
+    # GET: pré-preenche o formulário com o que veio do CSV (ou defaults)
+    if loja_map:
+        ls_flor = loja_map.get("ls_flor", DEFAULT_LS_FLOR)
+        ls_flv  = loja_map.get("ls_flv",  DEFAULT_LS_FLV)
+    else:
+        ls_flor = DEFAULT_LS_FLOR
+        ls_flv  = DEFAULT_LS_FLV
+
     return render_template(
         "settings.html",
-        ls_flor=LS_FLOR_VALUE,
-        ls_flv=LS_FLV_VALUE
+        ls_flor=ls_flor,
+        ls_flv=ls_flv
     )
 
 if __name__ == "__main__":
     # host='0.0.0.0' faz o Flask aceitar conexões de qualquer IP da sua LAN
     app.run(host="10.4.30.2", port=8000, debug=False, use_reloader=False)
+    
