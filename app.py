@@ -592,41 +592,33 @@ def logout():
 
 @app.route("/settings", methods=["GET","POST"])
 def settings():
-    global IP_IMPRESSORA, LS_FLOR_VALUE, LS_FLV_VALUE
-
     if not session.get('logged_in'):
         return redirect(url_for('login', next=url_for('settings')))
 
-    if request.method == "POST":
-        novo_ip = request.form.get('ip','').strip()
-        ls_f    = request.form.get('ls_flor','')
-        ls_v    = request.form.get('ls_flv','')
+    mappings = load_printer_map()
+    client_ip = request.remote_addr
+    loja_map = next((m for m in mappings if client_ip.startswith(m['pattern'].rstrip('*'))), None)
+    if not loja_map: 
+        flash("❌ Loja não cadastrada", "error")
+        return redirect(url_for("index"))
 
-        # Atualiza variáveis globais
-        if novo_ip:
-            IP_IMPRESSORA = novo_ip
-        try:
-            LS_FLOR_VALUE = int(ls_f)
-            LS_FLV_VALUE  = int(ls_v)
-        except ValueError:
-            flash("❌ Valores inválidos para LS", "error")
-            return redirect(url_for('settings'))
+    if request.method=="POST":
+        ip_new    = request.form.get("ip","").strip()
+        ls_flor   = int(request.form.get("ls_flor", loja_map['ls_flor']))
+        ls_flv    = int(request.form.get("ls_flv",  loja_map['ls_flv']))
 
-        # Salva no disco e recarrega em memória
-        try:
-            save_config()
-            load_config()
-            flash("✅ Configurações salvas com sucesso!", "success")
-        except Exception as e:
-            flash(f"❌ Falha ao salvar configurações: {e}", "error")
+        loja_map['ip']      = ip_new or loja_map['ip']
+        loja_map['ls_flor'] = ls_flor
+        loja_map['ls_flv']  = ls_flv
 
-        return redirect(url_for('settings'))
+        save_printer_map(mappings)
+        flash("✅ Configurações atualizadas!", "success")
+        return redirect(url_for("settings"))
 
-    return render_template(
-        "settings.html",
-        ip_impressora=IP_IMPRESSORA,
-        ls_flor=LS_FLOR_VALUE,
-        ls_flv=LS_FLV_VALUE
+    return render_template("settings.html",
+        ip      = loja_map['ip'],
+        ls_flor = loja_map['ls_flor'],
+        ls_flv  = loja_map['ls_flv']
     )
 
 if __name__ == "__main__":
