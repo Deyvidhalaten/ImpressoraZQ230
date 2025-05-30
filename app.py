@@ -79,6 +79,13 @@ def load_printer_map():
 
 load_printer_map()
 
+def get_loja_map():
+    client_ip = request.remote_addr
+    for m in load_printer_map():
+        if client_ip.startswith(m['pattern'].rstrip('*')):
+            return m
+    return None
+
 def get_mapping_for_ip(client_ip, mappings):
     """Retorna o mapeamento cuja pattern case com o client_ip."""
     for m in mappings:
@@ -430,9 +437,14 @@ def index():
         codigo = request.form.get("codigo", "").strip()
         modo   = request.form.get("modo",   "Floricultura")
         action = request.form.get("action", "print")
-
+        
         # --- Ação de "Enviar Carga" (LS ZPL) ---
         if action == "load":
+            loja_map = get_loja_map()
+            if loja_map is None:
+                flash("❌ Sua loja não está cadastrada. Acesse “Impressoras” para adicioná-la.", "error")
+                return redirect(url_for("index"))
+            
             ls = ls_flor_mapped if modo == "Floricultura" else ls_flv_mapped
             zpl = f"^XA\n^MD30\n^LS{ls}\n^XZ"
             ok  = enviar_para_impressora_ip(zpl, printer_ip)
@@ -444,6 +456,9 @@ def index():
 
         # --- Ação de "Imprimir" via driver Windows/GDI ---
         if action == "print":
+            if loja_map is None:
+              flash("❌ Sua loja não está cadastrada. Acesse “Impressoras” para adicioná-la.", "error")
+              return redirect(url_for("index"))
             # lê e valida número de cópias
             try:
                 copies = int(request.form.get("copies", "1"))
@@ -598,9 +613,6 @@ def settings():
     mappings = load_printer_map()
     client_ip = request.remote_addr
     loja_map = next((m for m in mappings if client_ip.startswith(m['pattern'].rstrip('*'))), None)
-    if not loja_map: 
-        flash("❌ Loja não cadastrada", "error")
-        return redirect(url_for("index"))
 
     if request.method=="POST":
         ip_new    = request.form.get("ip","").strip()
