@@ -607,30 +607,27 @@ def logout():
 
 @app.route("/settings", methods=["GET","POST"])
 def settings():
-    if not session.get('logged_in'):
-        return redirect(url_for('login', next=url_for('settings')))
+    global LS_FLOR_VALUE, LS_FLV_VALUE
 
-    mappings = load_printer_map()
-    client_ip = request.remote_addr
-    loja_map = next((m for m in mappings if client_ip.startswith(m['pattern'].rstrip('*'))), None)
+    if request.method == "POST":
+        # pega os novos valores de LS direto do form
+        ls_f = request.form.get('ls_flor','').strip()
+        ls_v = request.form.get('ls_flv','').strip()
 
-    if request.method=="POST":
-        ip_new    = request.form.get("ip","").strip()
-        ls_flor   = int(request.form.get("ls_flor", loja_map['ls_flor']))
-        ls_flv    = int(request.form.get("ls_flv",  loja_map['ls_flv']))
+        try:
+            LS_FLOR_VALUE = int(ls_f)
+            LS_FLV_VALUE  = int(ls_v)
+            save_printer_map(load_printer_map())  # ou save_config() se mantiver config.txt
+            flash("✅ LS atualizados com sucesso!", "success")
+        except ValueError:
+            flash("❌ Valores inválidos para LS", "error")
+        return redirect(url_for('settings'))
 
-        loja_map['ip']      = ip_new or loja_map['ip']
-        loja_map['ls_flor'] = ls_flor
-        loja_map['ls_flv']  = ls_flv
-
-        save_printer_map(mappings)
-        flash("✅ Configurações atualizadas!", "success")
-        return redirect(url_for("settings"))
-
-    return render_template("settings.html",
-        ip      = loja_map['ip'],
-        ls_flor = loja_map['ls_flor'],
-        ls_flv  = loja_map['ls_flv']
+    # Renderiza o form mostrando os LS que estão no CSV
+    return render_template(
+        "settings.html",
+        ls_flor=LS_FLOR_VALUE,
+        ls_flv=LS_FLV_VALUE
     )
 
 if __name__ == "__main__":
