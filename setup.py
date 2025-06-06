@@ -13,7 +13,7 @@ includefiles = [
     ("templates", "templates"),
     ("static",   "static"),
     ("baseFloricultura.csv", "baseFloricultura.csv"),
-    ("config.txt",           "config.txt"),
+    ("printers.csv",           "printers.csv"),
     
     (os.path.join(os.environ["WINDIR"], "Fonts", "arial.ttf"), "arial.ttf"),
 ]
