@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Logs de Sistema</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <div class="nav">
+      <a href="{{ url_for('index') }}">Impressão</a>
+      <a href="{{ url_for('printers') }}">Impressoras</a>
+      <a href="{{ url_for('logs') }}" class="active">Logs</a>
+      <a href="{{ url_for('logout') }}">Logout</a>
+    </div>
+
+    <h1>Histórico de Logs</h1>
+
+    {% if logs %}
+      <table style="width:100%; border-collapse: collapse;">
+        <thead>
+          <tr>
+            <th style="border-bottom:1px solid #ccc; padding:8px; text-align:left;">Timestamp</th>
+            <th style="border-bottom:1px solid #ccc; padding:8px; text-align:left;">Evento</th>
+            <th style="border-bottom:1px solid #ccc; padding:8px; text-align:left;">IP</th>
+            <th style="border-bottom:1px solid #ccc; padding:8px; text-align:left;">Impressora</th>
+            <th style="border-bottom:1px solid #ccc; padding:8px; text-align:left;">Detalhes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in logs %}
+          <tr>
+            <td style="padding:8px;">{{ row['timestamp'] }}</td>
+            <td style="padding:8px;">{{ row['evento'] }}</td>
+            <td style="padding:8px;">{{ row['ip'] }}</td>
+            <td style="padding:8px;">{{ row['impressora'] }}</td>
+            <td style="padding:8px;">{{ row['detalhes'] }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>Nenhum log registrado ainda.</p>
+    {% endif %}
+
+  </div>
+</body>
+</html>

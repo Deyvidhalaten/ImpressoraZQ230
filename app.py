@@ -11,12 +11,13 @@ import csv
 import win32print  # type: ignore
 import win32ui     # type: ignore
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from PIL import Image, ImageWin, ImageDraw, ImageFont
 from flask import (
     Flask, render_template, request, redirect,
     flash, session, url_for
 )
+
 
 windows_font = os.path.join(os.environ['WINDIR'], 'Fonts', 'arial.ttf')
 # e quando for instanciar:
@@ -27,6 +28,7 @@ BASE_DIR     = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) 
 CONFIG_FILE  = os.path.join(BASE_DIR, 'config.txt')
 CSV_FILE     = os.path.join(BASE_DIR, 'baseFloricultura.csv')
 PRINTERS_CSV = os.path.join(BASE_DIR, 'printers.csv')
+LOG_FILE = os.path.join(BASE_DIR, "logs.csv")
 
 DEFAULT_IP       = "10.17.30.119"
 DEFAULT_PORTA    = 9100
@@ -76,7 +78,23 @@ def load_printer_map():
             })
     return maps
 
-
+#acrescenta uma linha com data/hora, tipo de evento, IP, impressora (se houver) e detalhes.
+def append_log(evento: str, ip: str = "", impressora: str = "", detalhes: str = ""):
+    """
+    Acrescenta uma linha em logs.csv com as colunas:
+    timestamp,evento,ip,impressora,detalhes
+    """
+    # Garante que o arquivo exista; se não existir, cria e adiciona cabeçalho
+    if not os.path.exists(LOG_FILE):
+        with open(LOG_FILE, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["timestamp", "evento", "ip", "impressora", "detalhes"])
+    # Grava a nova linha
+    ts = datetime.now().isoformat(sep=" ", timespec="seconds")
+    with open(LOG_FILE, "a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow([ts, evento, ip, impressora, detalhes])
+        
 load_printer_map()
 
 def get_loja_map():
@@ -496,10 +514,27 @@ def index():
             try:
                 disable_reset_and_set_ls(ls_value=ls, printer_name=driver_for_request)
                 for _ in range(copies):
+
+                    ##Logs
+                    append_log(
+                        evento="print",
+                        ip=client_ip,
+                        impressora=driver_for_request,
+                        detalhes=f"ean={rec['ean']}, codprod={rec['codprod']}, copies={copies}, modo={modo}, LS={ls}" 
+                    )
+
                     print_image_via_driver(double, xoff, printer_name=driver_for_request)
                     disable_reset_and_set_ls(ls_value=ls, printer_name=driver_for_request)
+
                 flash(f"✅ {copies} cópia(s) impressa(s) via '{driver_for_request}'", "success")
             except Exception as e:
+                ##Logs
+                append_log(
+                    evento="print_error",
+                    ip=client_ip,
+                    impressora=driver_for_request,
+                    detalhes=f"erro={e}"
+                )
                 flash(f"❌ Erro ao imprimir: {e}", "error")
             finally:
                 for p in (raw, single, double):
@@ -534,47 +569,100 @@ def login():
 @app.route("/printers", methods=["GET","POST"])
 def printers():
     mappings = load_printer_map()
+    # Ordena por loja crescente
     mappings.sort(key=lambda m: int(m['loja'] or 0))
 
     if request.method == "POST":
-        # DELETE
-        if request.form.get("action") == "delete":
-            pattern = request.form["pattern"]
-            mappings = [m for m in mappings if m["pattern"] != pattern]
-            save_printer_map(mappings)
-            flash("🗑️ Mapeamento excluído!", "success")
+        action_type = request.form.get("action", "save")  # “save” por padrão ou “delete”
+
+        # —— Excluir mapeamento ——
+        if action_type == "delete":
+            pattern_to_delete = request.form.get("pattern")
+            # busca o mapeamento antes de remover, para log
+            m_antigo = next((m for m in mappings if m["pattern"] == pattern_to_delete), None)
+            if m_antigo:
+                mappings = [m for m in mappings if m["pattern"] != pattern_to_delete]
+                save_printer_map(mappings)
+                append_log(
+                    evento="mapping_delete",
+                    ip=request.remote_addr,
+                    impressora=m_antigo.get("driver",""),
+                    detalhes=f"loja={m_antigo['loja']}, pattern={pattern_to_delete}"
+                )
+                flash(f"🗑️ Mapeamento '{pattern_to_delete}' excluído com sucesso!", "success")
+            else:
+                flash("❌ Mapeamento não encontrado para exclusão.", "error")
             return redirect(url_for("printers"))
 
-        # ADD / EDIT
-        loja   = request.form['loja'].strip()
-        driver = request.form['driver'].strip()
+        # —— Adicionar ou editar mapeamento ——
+        loja   = request.form.get('loja','').strip()
+        driver = request.form.get('driver','').strip()
         funcao = request.form.get('funcao','').strip()
-        ip     = request.form['ip'].strip()
-        ls_f   = int(request.form.get('ls_flor', 0))
-        ls_v   = int(request.form.get('ls_flv', 0))
+        ls_flor = request.form.get('ls_flor','').strip()
+        ls_flv  = request.form.get('ls_flv','').strip()
 
-        pattern = f"10.{int(loja)}*"
+        # Validação mínima
+        if not loja.isdigit() or not driver:
+            flash("❌ Loja e driver são obrigatórios", "error")
+            return redirect(url_for('printers'))
+
+        try:
+            ls_flor_val = int(ls_flor)
+            ls_flv_val  = int(ls_flv)
+        except ValueError:
+            flash("❌ Valores de LS inválidos", "error")
+            return redirect(url_for('printers'))
+
+        pattern = f"10.{int(loja)}.*"  # armazenamos “10.<loja>.*” para coincidir com qualquer “10.X.”
         updated = False
+
         for m in mappings:
             if m['pattern'] == pattern:
-                m.update(driver=driver, funcao=funcao, ip=ip, ls_flor=ls_f, ls_flv=ls_v)
+                # antes de alterar, guardo estado antigo
+                m_antigo = m.copy()
+                m['driver']  = driver
+                m['funcao']  = funcao
+                m['ls_flor'] = ls_flor_val
+                m['ls_flv']  = ls_flv_val
                 updated = True
+                # grava log de edição
+                append_log(
+                    evento="mapping_update",
+                    ip=request.remote_addr,
+                    impressora=driver,
+                    detalhes=(
+                        f"loja={loja}, "
+                        f"old_driver={m_antigo['driver']}, new_driver={driver}, "
+                        f"old_ls_flor={m_antigo['ls_flor']}, new_ls_flor={ls_flor_val}, "
+                        f"old_ls_flv={m_antigo['ls_flv']}, new_ls_flv={ls_flv_val}"
+                    )
+                )
                 break
+
         if not updated:
-            mappings.append({
+            novo = {
                 'loja':    loja,
                 'pattern': pattern,
                 'driver':  driver,
                 'funcao':  funcao,
-                'ip':      ip,
-                'ls_flor': ls_f,
-                'ls_flv':  ls_v,
-            })
+                'ls_flor': ls_flor_val,
+                'ls_flv':  ls_flv_val
+            }
+        mappings.append(novo)
+        append_log(
+           evento="mapping_add",
+           ip=request.remote_addr,
+           impressora=driver,
+           detalhes=(
+              f"loja={loja}, driver={driver}, "
+              f"ls_flor={ls_flor_val}, ls_flv={ls_flv_val}"
+        ))
 
         save_printer_map(mappings)
-        flash("✅ Mapeamento salvo!", "success")
-        return redirect(url_for("printers"))
+        flash("✅ Mapeamento salvo com sucesso!", "success")
+        return redirect(url_for('printers'))
 
+    # GET: renderiza a página normalmente
     return render_template("printers.html", mappings=mappings)
 
 def save_printer_map(mappings):
@@ -592,6 +680,17 @@ def save_printer_map(mappings):
                 'ls_flor': m.get('ls_flor',0),
                 'ls_flv':  m.get('ls_flv',0),
             })
+
+@app.route("/logs")
+def logs():
+    # Lê todo o CSV de logs e passa para o template
+    linhas = []
+    if os.path.exists(LOG_FILE):
+        with open(LOG_FILE, newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                linhas.append(row)
+    return render_template("logs.html", logs=linhas)
 
 @app.route("/logout")
 def logout():
@@ -650,6 +749,10 @@ def settings():
     )
 
 if __name__ == "__main__":
+    append_log(evento="startup")
+    try:
     # host='0.0.0.0' faz o Flask aceitar conexões de qualquer IP da sua LAN
-    app.run(host="10.4.30.2", port=8000, debug=False, use_reloader=False)
+      app.run(host="10.4.30.2", port=8000, debug=False, use_reloader=False)
+    finally:
+        append_log(evento="shutdown")
     

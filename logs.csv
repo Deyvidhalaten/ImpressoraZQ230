@@ -1,0 +1,5 @@
+timestamp,evento,ip,impressora,detalhes2025-06-06 12:41:35,mapping_add,10.4.30.2,ZD230-203dpi.floricultura01,"loja=1, driver=ZD230-203dpi.floricultura01, ls_flor=0, ls_flv=0"
+2025-06-06 13:36:38,mapping_add,10.4.30.2,ZD230-203dpi.floricultura,"loja=2, driver=ZD230-203dpi.floricultura, ls_flor=0, ls_flv=0"
+2025-06-06 13:37:17,mapping_delete,10.4.30.2,ZD230-203dpi.floricultura01,"loja=1, pattern=10.1.*"
+2025-06-06 13:37:19,mapping_delete,10.4.30.2,ZD230-203dpi.floricultura,"loja=2, pattern=10.2.*"
+2025-06-06 13:41:15,print,10.4.30.42,ZD230-203dpi.floricultura04,"ean=3000030425375, codprod=304253-7, copies=1, modo=Floricultura, LS=-25"
