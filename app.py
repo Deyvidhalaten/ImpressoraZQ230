@@ -282,28 +282,25 @@ PRINTER_NAME = "ZDesigner ZD230-203dpi ZPL"
 
 def print_image_via_driver(image_path: str, x_offset: int, printer_name: str):
     """
-    1) Desabilita o reset do driver e reaplica o LS via ZPL (preserva margem)
-    2) Imprime o PNG via GDI já deslocado (x_offset, Y_OFFSET)
+    Imprime uma ou mais cópias de um PNG via driver Zebra, 
+    ajustando o DEVMODE.Copies para o número de cópias desejado.
     """
-    # 1) escolhe a impressora
-    if printer_name is None:
-        # usa padrão do Windows, ou nosso nome fixo
-        printer_name = win32print.GetDefaultPrinter() or "ZDesigner ZD230-203dpi ZPL"
-    print(f"[DEBUG] Usando impressora: '{printer_name}'")
-    
-    # 2) antes de desenhar via GDI, manda PJL+ZPL pra desabilitar o reset
-    #    e manter o LS (em dots) 
-    ls = x_offset  # já veio como abs(LS_FLOR_VALUE) ou abs(LS_FLV_VALUE)
-    disable_reset_and_set_ls(ls_value=ls, printer_name=printer_name)
+    # 1) Abre a impressora e atualiza o DEVMODE
+    hPrinter = win32print.OpenPrinter(printer_name)
+    try:
+        # GetPrinter retorna um dict com 'pDevMode'
+        prn_info = win32print.GetPrinter(hPrinter, 2)
+        devmode  = prn_info['pDevMode']
+        # grava de volta
+        prn_info['pDevMode'] = devmode
+        win32print.SetPrinter(hPrinter, 2, prn_info, 0)
+    finally:
+        win32print.ClosePrinter(hPrinter)
 
-    # 3) abre o contexto de impressão GDI
     hDC = win32ui.CreateDC()
     hDC.CreatePrinterDC(printer_name)
-
-    # 4) move o ponto de origem para aplicar os offsets
     hDC.SetViewportOrg((x_offset, Y_OFFSET))
 
-    # 5) carrega e imprime a imagem
     img = Image.open(image_path)
     w, h = img.size
 
@@ -325,6 +322,21 @@ def enviar_para_impressora(zpl: str) -> bool:
         print("Erro ao enviar ZPL:", e)
         return False
 
+def stack_labels(label_path: str, copies: int) -> str:
+    """
+    Lê a imagem única de etiqueta em label_path e
+    cria uma nova imagem com 'copies' etiquetas empilhadas verticalmente.
+    Retorna o caminho da imagem empilhada.
+    """
+    img   = Image.open(label_path)
+    w, h  = img.size
+    canvas = Image.new("RGB", (w, h * copies), "white")
+    for i in range(copies):
+        canvas.paste(img, (0, i * h))
+    out_path = label_path.replace(".png", f"_stack_{copies}.png")
+    canvas.save(out_path)
+    return out_path
+
 def print_raw_zpl(zpl_bytes: bytes, printer_name: str = None):
     """
     Envia bytes RAW (PJL+ZPL) diretamente para a fila, sem passar
@@ -332,7 +344,8 @@ def print_raw_zpl(zpl_bytes: bytes, printer_name: str = None):
     """
     if printer_name is None:
         printer_name = win32print.GetDefaultPrinter()
-    h = win32print.OpenPrinter(printer_name)
+    h = win32print.OpenPrinter(printer_name,
+    {"DesiredAccess": win32print.PRINTER_ACCESS_USE})
     try:
         win32print.StartDocPrinter(h, 1, ("RAW_ZPL", None, "RAW"))
         win32print.StartPagePrinter(h)
@@ -513,18 +526,27 @@ def index():
 
             try:
                 disable_reset_and_set_ls(ls_value=ls, printer_name=driver_for_request)
-                for _ in range(copies):
+                # 1) empilha labels para que seja 1 único trabalho
+                stacked = stack_labels(double, copies)
 
-                    ##Logs
-                    append_log(
-                        evento="print",
-                        ip=client_ip,
-                        impressora=driver_for_request,
-                        detalhes=f"ean={rec['ean']}, codprod={rec['codprod']}, copies={copies}, modo={modo}, LS={ls}" 
-                    )
+                # 2) registra apenas 1 log
+                append_log(
+                   evento="print",
+                   ip=client_ip,
+                   impressora=driver_for_request,
+                   detalhes=(
+                       f"ean={rec['ean']}, codprod={rec['codprod']}, "
+                       f"copies={copies}, modo={modo}, LS={ls}"
+                   ) 
+                )
 
-                    print_image_via_driver(double, xoff, printer_name=driver_for_request)
-                    disable_reset_and_set_ls(ls_value=ls, printer_name=driver_for_request)
+                # 3) dispara apenas um job GDI
+                print_image_via_driver(stacked, xoff, printer_name=driver_for_request)
+
+                  # 4) limpa também a imagem empilhada
+                if os.path.exists(stacked):
+                     os.remove(stacked)
+                disable_reset_and_set_ls(ls_value=ls, printer_name=driver_for_request)
 
                 flash(f"✅ {copies} cópia(s) impressa(s) via '{driver_for_request}'", "success")
             except Exception as e:
