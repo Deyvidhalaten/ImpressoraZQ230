@@ -1,4 +1,6 @@
 import ssl
+
+import win32com
 ssl._create_default_https_context = ssl._create_unverified_context
 import sys
 import os
@@ -282,31 +284,37 @@ PRINTER_NAME = "ZDesigner ZD230-203dpi ZPL"
 
 def print_image_via_driver(image_path: str, x_offset: int, printer_name: str, copies: int = 1):
     """
-    Imprime um PNG via driver Zebra, ajustando o DEVMODE.Copies
-    para emitir 'copies' dentro de um único job GDI.
+    Imprime um PNG via driver Zebra, ajustando Copies apenas para
+    este job GDI, sem alterar as configurações globais da impressora.
     """
-    # 1) Garante que o LS esteja aplicado
+    # 1) garante que o LS já esteja aplicado
     disable_reset_and_set_ls(ls_value=abs(x_offset), printer_name=printer_name)
 
-    # 2) Abre a impressora e injeta o número de cópias no DEVMODE
+    # 2) abre o handle da impressora e obtém o DEVMODE atual
     hPrinter = win32print.OpenPrinter(printer_name)
     try:
         prn_info = win32print.GetPrinter(hPrinter, 2)
-        devmode  = prn_info['pDevMode']
+        devmode   = prn_info['pDevMode']
+        # 2a) ajusta só para este job
         devmode.Copies = copies
-        prn_info['pDevMode'] = devmode
-        win32print.SetPrinter(hPrinter, 2, prn_info, 0)
+        # 2b) gera um novo DEVMODE válido em memória
+        new_devmode = win32print.DocumentProperties(
+            None, hPrinter, printer_name,
+            devmode,    # entrada
+            devmode,    # saída
+            win32com.DM_OUT_BUFFER
+        )
     finally:
         win32print.ClosePrinter(hPrinter)
 
-    # 3) Cria o DC GDI normalmente (herdando o DEVMODE ajustado)
+    # 3) cria o DC GDI passando esse DEVMODE ajustado
     hDC = win32ui.CreateDC()
-    hDC.CreatePrinterDC(printer_name)
+    # a assinatura é CreatePrinterDC(driverName, deviceName, port, pDevMode)
+    # mas em pywin32 basta:
+    hDC.CreatePrinterDC(printer_name, new_devmode)
 
-    # 4) Aplica deslocamento
+    # 4) aplica offset e manda desenhar normalmente
     hDC.SetViewportOrg((x_offset, Y_OFFSET))
-
-    # 5) Desenha a imagem
     img = Image.open(image_path)
     w, h = img.size
 
@@ -549,7 +557,7 @@ def index():
                 # 3) dispara apenas um job GDI
                 print_image_via_driver(double, xoff, printer_name=driver_for_request, copies=copies)
 
-                  # 4) limpa também a imagem empilhada
+                # 4) limpa também a imagem empilhada
                 if os.path.exists(stacked):
                      os.remove(stacked)
                 disable_reset_and_set_ls(ls_value=ls, printer_name=driver_for_request)
