@@ -277,30 +277,36 @@ def resolve_printer_name(requested_name: str) -> str:
     raise RuntimeError(f"Impressora não encontrada: '{requested_name}'")
 
 # --- Impressão via driver Zebra usando ImageWin ---
-Y_OFFSET = 50
+Y_OFFSET = 100
 PRINTER_NAME = "ZDesigner ZD230-203dpi ZPL"
 
-def print_image_via_driver(image_path: str, x_offset: int, printer_name: str):
+def print_image_via_driver(image_path: str, x_offset: int, printer_name: str, copies: int = 1):
     """
-    Imprime uma ou mais cópias de um PNG via driver Zebra, 
-    ajustando o DEVMODE.Copies para o número de cópias desejado.
+    Imprime um PNG via driver Zebra, ajustando o DEVMODE.Copies
+    para emitir 'copies' dentro de um único job GDI.
     """
-    # 1) Abre a impressora e atualiza o DEVMODE
+    # 1) Garante que o LS esteja aplicado
+    disable_reset_and_set_ls(ls_value=abs(x_offset), printer_name=printer_name)
+
+    # 2) Abre a impressora e injeta o número de cópias no DEVMODE
     hPrinter = win32print.OpenPrinter(printer_name)
     try:
-        # GetPrinter retorna um dict com 'pDevMode'
         prn_info = win32print.GetPrinter(hPrinter, 2)
         devmode  = prn_info['pDevMode']
-        # grava de volta
+        devmode.Copies = copies
         prn_info['pDevMode'] = devmode
         win32print.SetPrinter(hPrinter, 2, prn_info, 0)
     finally:
         win32print.ClosePrinter(hPrinter)
 
+    # 3) Cria o DC GDI normalmente (herdando o DEVMODE ajustado)
     hDC = win32ui.CreateDC()
     hDC.CreatePrinterDC(printer_name)
+
+    # 4) Aplica deslocamento
     hDC.SetViewportOrg((x_offset, Y_OFFSET))
 
+    # 5) Desenha a imagem
     img = Image.open(image_path)
     w, h = img.size
 
@@ -541,7 +547,7 @@ def index():
                 )
 
                 # 3) dispara apenas um job GDI
-                print_image_via_driver(stacked, xoff, printer_name=driver_for_request)
+                print_image_via_driver(double, xoff, printer_name=driver_for_request, copies=copies)
 
                   # 4) limpa também a imagem empilhada
                 if os.path.exists(stacked):
@@ -774,7 +780,7 @@ if __name__ == "__main__":
     append_log(evento="startup")
     try:
     # host='0.0.0.0' faz o Flask aceitar conexões de qualquer IP da sua LAN
-      app.run(host="10.4.30.2", port=8000, debug=False, use_reloader=False)
+      app.run(host="10.17.30.2", port=8000, debug=False, use_reloader=False)
     finally:
         append_log(evento="shutdown")
     
