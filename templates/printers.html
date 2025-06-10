@@ -60,7 +60,6 @@
     <tr>
       <th>Loja</th>
       <th>Padrão IP</th>
-      <th>Driver</th>
       <th>Função</th>
       <th>IP da Impressora</th>
       <th>LS Flor</th>
@@ -73,7 +72,6 @@
     <tr>
       <td>{{ m.loja }}</td>
       <td>{{ m.pattern }}</td>
-      <td>{{ m.driver }}</td>
       <td>{{ m.funcao or '—' }}</td>
       <td>{{ m.ip or '—' }}</td>
       <td>{{ m.ls_flor }}</td>
@@ -94,9 +92,6 @@
 <form method="POST">
   <label>Loja:</label>
   <input name="loja" type="number" min="1" max="99" required>
-
-  <label>Driver:</label>
-  <input name="driver" type="text" required>
 
   <label>Função:</label>
   <input name="funcao" type="text">

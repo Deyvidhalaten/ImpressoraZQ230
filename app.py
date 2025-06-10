@@ -650,19 +650,20 @@ def printers():
 
         # —— Adicionar ou editar mapeamento ——
         loja   = request.form.get('loja','').strip()
-        driver = request.form.get('driver','').strip()
         funcao = request.form.get('funcao','').strip()
+        ip = request.form.get('ip','').strip()
         ls_flor = request.form.get('ls_flor','').strip()
         ls_flv  = request.form.get('ls_flv','').strip()
 
         # Validação mínima
-        if not loja.isdigit() or not driver:
+        if not loja.isdigit() :
             flash("❌ Loja e driver são obrigatórios", "error")
             return redirect(url_for('printers'))
 
         try:
             ls_flor_val = int(ls_flor)
             ls_flv_val  = int(ls_flv)
+            ip_str = str(ip)
         except ValueError:
             flash("❌ Valores de LS inválidos", "error")
             return redirect(url_for('printers'))
@@ -674,8 +675,8 @@ def printers():
             if m['pattern'] == pattern:
                 # antes de alterar, guardo estado antigo
                 m_antigo = m.copy()
-                m['driver']  = driver
                 m['funcao']  = funcao
+                m['ip'] = ip_str
                 m['ls_flor'] = ls_flor_val
                 m['ls_flv']  = ls_flv_val
                 updated = True
@@ -683,10 +684,8 @@ def printers():
                 append_log(
                     evento="mapping_update",
                     ip=request.remote_addr,
-                    impressora=driver,
                     detalhes=(
                         f"loja={loja}, "
-                        f"old_driver={m_antigo['driver']}, new_driver={driver}, "
                         f"old_ls_flor={m_antigo['ls_flor']}, new_ls_flor={ls_flor_val}, "
                         f"old_ls_flv={m_antigo['ls_flv']}, new_ls_flv={ls_flv_val}"
                     )
@@ -697,7 +696,7 @@ def printers():
             novo = {
                 'loja':    loja,
                 'pattern': pattern,
-                'driver':  driver,
+                'ip':      ip_str,
                 'funcao':  funcao,
                 'ls_flor': ls_flor_val,
                 'ls_flv':  ls_flv_val
@@ -706,9 +705,8 @@ def printers():
         append_log(
            evento="mapping_add",
            ip=request.remote_addr,
-           impressora=driver,
            detalhes=(
-              f"loja={loja}, driver={driver}, "
+              f"loja={loja}, "
               f"ls_flor={ls_flor_val}, ls_flv={ls_flv_val}"
         ))
 
@@ -728,7 +726,6 @@ def save_printer_map(mappings):
             writer.writerow({
                 'loja':    m['loja'],
                 'pattern': m['pattern'],
-                'driver':  m['driver'],
                 'funcao':  m.get('funcao',''),
                 'ip':      m.get('ip',''),
                 'ls_flor': m.get('ls_flor',0),
