@@ -1,6 +1,5 @@
 import ssl
 
-import win32com
 ssl._create_default_https_context = ssl._create_unverified_context
 import sys
 import os
@@ -10,9 +9,10 @@ import urllib3
 import requests
 import csv
 
+from PIL import Image
 import win32print  # type: ignore
-import win32ui     # type: ignore
 
+from printer_zq230 import ZQ230Printer  #  Módulo de socket/ZPL
 from datetime import datetime, timedelta
 from PIL import Image, ImageWin, ImageDraw, ImageFont
 from flask import (
@@ -279,52 +279,53 @@ def resolve_printer_name(requested_name: str) -> str:
     raise RuntimeError(f"Impressora não encontrada: '{requested_name}'")
 
 # --- Impressão via driver Zebra usando ImageWin ---
-Y_OFFSET = 100
+""""""
+Y_OFFSET = -50
 PRINTER_NAME = "ZDesigner ZD230-203dpi ZPL"
 
+"""
 def print_image_via_driver(image_path: str, x_offset: int, printer_name: str, copies: int = 1):
-    """
-    Imprime um PNG via driver Zebra, ajustando Copies apenas para
-    este job GDI, sem alterar as configurações globais da impressora.
-    """
-    # 1) garante que o LS já esteja aplicado
+
+    #Imprime um PNG via driver Zebra, ajustando o PaperLength
+    #para empilhar 'copies' etiquetas num único job GDI.
+
+    # 1) Reaplica LS antes do job (se necessário)
     disable_reset_and_set_ls(ls_value=abs(x_offset), printer_name=printer_name)
 
-    # 2) abre o handle da impressora e obtém o DEVMODE atual
+    # 2) Abre a impressora, lê e ajusta o DEVMODE
     hPrinter = win32print.OpenPrinter(printer_name)
     try:
-        prn_info = win32print.GetPrinter(hPrinter, 2)
-        devmode   = prn_info['pDevMode']
-        # 2a) ajusta só para este job
+        prn_info = win32print.GetPrinter(hPrinter, 2)  
+        devmode   = prn_info['pDevMode']         
+
+        # define o número de cópias e marca o campo
         devmode.Copies = copies
-        # 2b) gera um novo DEVMODE válido em memória
-        new_devmode = win32print.DocumentProperties(
-            None, hPrinter, printer_name,
-            devmode,    # entrada
-            devmode,    # saída
-            win32com.DM_OUT_BUFFER
-        )
+        devmode.Fields |= win32con.DM_COPIES
+
+        # grava de volta no spooler
+        prn_info['pDevMode'] = devmode
+        win32print.SetPrinter(hPrinter, 2, prn_info, 0)
     finally:
         win32print.ClosePrinter(hPrinter)
 
-    # 3) cria o DC GDI passando esse DEVMODE ajustado
-    hDC = win32ui.CreateDC()
-    # a assinatura é CreatePrinterDC(driverName, deviceName, port, pDevMode)
-    # mas em pywin32 basta:
-    hDC.CreatePrinterDC(printer_name, new_devmode)
+    # 3) Cria o DC GDI COM o DEVMODE modificado
+    #    assinatura global: CreateDC(driverName, deviceName, output, pDevMode)
+    hDC = win32ui.CreateDC("WINSPOOL", printer_name, None, devmode)
 
-    # 4) aplica offset e manda desenhar normalmente
+    # 4) Aplica deslocamento e inicia o documento
     hDC.SetViewportOrg((x_offset, Y_OFFSET))
-    img = Image.open(image_path)
-    w, h = img.size
-
     hDC.StartDoc("Etiqueta")
     hDC.StartPage()
+
+    # 5) Desenha a imagem
+    img = Image.open(image_path)
     dib = ImageWin.Dib(img)
-    dib.draw(hDC.GetHandleOutput(), (0, 0, w, h))
+    dib.draw(hDC.GetHandleOutput(), (0, 0, img.size[0], img.size[1]))
+
+    # 6) Finaliza o job
     hDC.EndPage()
     hDC.EndDoc()
-
+"""
 # --- Envio legado ZPL ---
 def enviar_para_impressora(zpl: str) -> bool:
     try:
@@ -461,7 +462,30 @@ def compose_double_label(label_path: str, gap: int = 140) -> str:
     return out_path
 
 DB = load_db()
-Y_OFFSET = 50  # fixo vertical
+Y_OFFSET = 25  # fixo vertical
+
+
+def gerar_zpl_template(texto: str, codprod: str, ean: str, copies:int , ls:int) -> str:
+    
+    return f"""
+^XA 
+^PRD^FS 
+^LS{ls}^FS
+^PW663^FS
+^LH-20,0^FS 
+^LL200^FS 
+^JMA^FS 
+^BY2 
+^FO100,020^A0N,40,20^FD{texto} ^FS 
+^FO100,75^A0N,25,20^FD{codprod}^FS 
+^FO100,105^BEN,50,Y,N^FD{ean}^FS 
+^FO455,015^A0N,40,20^FD{texto}^FS 
+^FO455,75^A0N,25,20^FD{codprod}^FS 
+^FO450,105^BEN,50,Y,N^FD{ean}^FS 
+^PQ{copies},0,1,N^FS 
+^XZ
+ """
+
 
 # --- Rota principal ---
 @app.route("/", methods=["GET","POST"])
@@ -488,7 +512,7 @@ def index():
         driver_for_request = loja_map.get("driver")
         ls_flor = loja_map.get("ls_flor", DEFAULT_LS_FLOR)
         ls_flv  = loja_map.get("ls_flv",  DEFAULT_LS_FLV)
-
+        
         # --- Carregar carga via ZPL ---
         if action == "load":
             ls = ls_flor if modo=="Floricultura" else ls_flv
@@ -529,19 +553,26 @@ def index():
                 flash("❌ Produto não encontrado", "error")
                 return render_template("index.html")
 
-            # gera imagens
-            raw    = gerar_barcode_bwip(rec['ean'])
-            single = compose_label(raw, rec['descricao'], rec['codprod'])
-            double = compose_double_label(single)
-
             # escolhe margem e offset
             ls   = ls_flor if modo=="Floricultura" else ls_flv
             xoff = ls
 
+            
+
+            #Gerar dados para o ZPL
+            descricao = rec['descricao']    # Pesquisa Descrição
+            codprod = rec['codprod']        # Codigo Reduzido
+            ean = rec['ean']                # Codigo EAN
+            copies = max(1, min(int(request.form.get("copies","1")), 10000))  #Copias
+            
+            printer_ip = loja_map.get("ip", DEFAULT_IP)
+            printer_port = DEFAULT_PORTA
+            zpl = gerar_zpl_template(descricao,codprod,ean,copies,ls)
+
             try:
-                disable_reset_and_set_ls(ls_value=ls, printer_name=driver_for_request)
-                # 1) empilha labels para que seja 1 único trabalho
-                stacked = stack_labels(double, copies)
+                
+                printer = ZQ230Printer(host=printer_ip, port=printer_port)
+                printer.print_label(zpl)
 
                 # 2) registra apenas 1 log
                 append_log(
@@ -554,14 +585,6 @@ def index():
                    ) 
                 )
 
-                # 3) dispara apenas um job GDI
-                print_image_via_driver(double, xoff, printer_name=driver_for_request, copies=copies)
-
-                # 4) limpa também a imagem empilhada
-                if os.path.exists(stacked):
-                     os.remove(stacked)
-                disable_reset_and_set_ls(ls_value=ls, printer_name=driver_for_request)
-
                 flash(f"✅ {copies} cópia(s) impressa(s) via '{driver_for_request}'", "success")
             except Exception as e:
                 ##Logs
@@ -572,11 +595,6 @@ def index():
                     detalhes=f"erro={e}"
                 )
                 flash(f"❌ Erro ao imprimir: {e}", "error")
-            finally:
-                for p in (raw, single, double):
-                    if p and os.path.exists(p):
-                        os.remove(p)
-
             return render_template("index.html")
 
     # rota GET: apenas exibe o formulário, sem checar nada
