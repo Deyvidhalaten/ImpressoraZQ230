@@ -19,3 +19,5 @@ timestamp,evento,ip,loja,copies
 2025-06-10 17:19:28,print,10.17.70.1,17,"ean=3000000389386, codprod=3893-8, copies=10, modo=Floricultura, LS=50"
 2025-06-10 18:34:14,print,10.17.70.1,17,"ean=3000030640778, codprod=306407-7, copies=10, modo=Floricultura, LS=50"
 2025-06-10 19:19:10,print,10.17.70.1,17,"ean=3000000400104, codprod=4001-0, copies=10, modo=Floricultura, LS=50"
+2025-06-11 08:59:24,print,10.4.30.4,4,"ean=3000000389898, codprod=3898-9, copies=1, modo=Floricultura, LS=-10"
+2025-06-11 09:21:49,print,10.4.30.2,4,"ean=7890291333825, codprod=231958-6, copies=1, modo=Floricultura, LS=-10"

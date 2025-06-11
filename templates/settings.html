@@ -9,25 +9,26 @@
 <body>
   <div class="container">
 
-    <!-- Botão vermelho de Encerrar Sistema -->
-    <form method="POST" action="{{ url_for('shutdown') }}" style="float:right; margin-top:10px;">
-      <input type="password"
-             name="shutdown_password"
-             placeholder="Senha p/ encerrar"
-             required
-             style="padding:4px; width:140px; margin-right:4px;">
-      <button type="submit"
-              style="background:#e74c3c; color:#fff; border:none; padding:6px 12px; cursor:pointer;">
-        Encerrar Sistema
-      </button>
-    </form>
-
     <div class="nav">
       <a href="{{ url_for('index') }}">Impressão</a>
       <a href="{{ url_for('printers') }}">Cadastro Impressora</a>
       <a href="{{ url_for('logs') }}" class="{{ 'active' if request.endpoint=='logs' else '' }}"> Logs</a>
       <a href="{{ url_for('logout') }}">Logout</a>
     </div>
+
+<!-- Botão vermelho de Encerrar Sistema, agora centralizado -->
+<form method="POST"
+      action="{{ url_for('shutdown') }}"
+      class="shutdown-form"
+      novalidate>
+  <input type="password"
+         name="shutdown_password"
+         placeholder="Senha p/ encerrar"
+         required>
+  <button type="submit">
+    Encerrar Sistema
+  </button>
+</form>
 
     <h1>Configurar Impressora</h1>
     <form method="POST" action="{{ url_for('settings') }}">

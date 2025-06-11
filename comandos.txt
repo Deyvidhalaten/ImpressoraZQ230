@@ -2,9 +2,9 @@ python setup.py build
 pip install pyinstaller
 pip install flask                     # web framework
 pip install requests                  # para chamadas HTTP (bwip-js, se usar)
-pip install pillow                    # manipulação de imagens
-pip install python-barcode[images]    # gera EAN-13 como PNG
-pip install pywin32                   # impressão via driver no Windows
+-pip install pillow                    # manipulação de imagens - Desatualizado
+-pip install python-barcode[images]    # gera EAN-13 como PNG - Desatualizado
+-pip install pywin32                   # impressão via driver no Windows - Desatualizado
 
 pip install waitress
 Caso de erro ao isntalar o waitress pode ser a versão do python, podes voltar para o 3.11 ou rodar este: 
