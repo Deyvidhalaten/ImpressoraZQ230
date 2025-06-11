@@ -1,3 +1,4 @@
+import fnmatch
 import ssl
 
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -72,7 +73,6 @@ def load_printer_map():
             maps.append({
                 'loja':    row['loja'],
                 'pattern': row['pattern'],
-                'driver':  row['driver'],
                 'funcao':  row.get('funcao',''),
                 'ip':      row.get('ip',''),
                 'ls_flor': int(row.get('ls_flor', 0)),
@@ -462,7 +462,7 @@ def compose_double_label(label_path: str, gap: int = 140) -> str:
     return out_path
 
 DB = load_db()
-Y_OFFSET = 25  # fixo vertical
+Y_OFFSET = 50  # fixo vertical
 
 
 def gerar_zpl_template(texto: str, codprod: str, ean: str, copies:int , ls:int) -> str:
@@ -470,10 +470,10 @@ def gerar_zpl_template(texto: str, codprod: str, ean: str, copies:int , ls:int) 
     return f"""
 ^XA 
 ^PRD^FS 
-^LS{ls}^FS
+^LS60^FS
 ^PW663^FS
-^LH-20,0^FS 
-^LL200^FS 
+^LT0
+^LL250^FS 
 ^JMA^FS 
 ^BY2 
 ^FO100,020^A0N,40,20^FD{texto} ^FS 
@@ -498,10 +498,12 @@ def index():
         # --- Identifica qual mapeamento (loja) corresponde ao IP solicitante ---
         mappings  = load_printer_map()
         client_ip = request.remote_addr
-        loja_map  = next(
-            (m for m in mappings if client_ip.startswith(f"10.{m['loja']}.") ),
+         # --- Identifica qual mapeamento (loja) corresponde ao IP solicitante ---
+        loja_map = next(
+            (m for m in mappings if fnmatch.fnmatch(client_ip, m['pattern'])),
             None
         )
+        
 
         # --- Se não estiver cadastrado, avisa e não faz nada além disso ---
         if loja_map is None:
@@ -509,14 +511,14 @@ def index():
             return render_template("index.html")
 
         # extrai driver e margens configuradas para esta loja
-        driver_for_request = loja_map.get("driver")
+        driver_for_request = loja_map.get("loja")
         ls_flor = loja_map.get("ls_flor", DEFAULT_LS_FLOR)
         ls_flv  = loja_map.get("ls_flv",  DEFAULT_LS_FLV)
         
         # --- Carregar carga via ZPL ---
         if action == "load":
             ls = ls_flor if modo=="Floricultura" else ls_flv
-            disable_reset_and_set_ls(ls_value=ls, printer_name=driver_for_request)
+
             flash(f"✅ Carga '{modo}' (LS={ls}) enviada!", "success")
             return render_template("index.html")
 
@@ -695,7 +697,6 @@ def printers():
         if not updated:
             novo = {
                 'loja':    loja,
-                'pattern': pattern,
                 'ip':      ip_str,
                 'funcao':  funcao,
                 'ls_flor': ls_flor_val,
