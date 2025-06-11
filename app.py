@@ -470,7 +470,7 @@ def gerar_zpl_template(texto: str, codprod: str, ean: str, copies:int , ls:int) 
     return f"""
 ^XA 
 ^PRD^FS 
-^LS60^FS
+^LS{ls}^FS
 ^PW663^FS
 ^LT0
 ^LL250^FS 
@@ -557,9 +557,6 @@ def index():
 
             # escolhe margem e offset
             ls   = ls_flor if modo=="Floricultura" else ls_flv
-            xoff = ls
-
-            
 
             #Gerar dados para o ZPL
             descricao = rec['descricao']    # Pesquisa Descrição

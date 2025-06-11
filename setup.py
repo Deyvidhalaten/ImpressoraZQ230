@@ -1,6 +1,8 @@
+import ssl
 import sys, os, glob
 from cx_Freeze import setup, Executable
 
+ssl._create_default_https_context = ssl._create_unverified_context
 # local do pywin32 DLLs
 pywin32_system32 = os.path.join(
     sys.base_prefix, "Lib", "site-packages", "pywin32_system32"
