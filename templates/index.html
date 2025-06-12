@@ -20,7 +20,7 @@
     </div>
 
     <h1>Imprimir EAN-13</h1>
-    <<form method="POST" action="{{ url_for('index') }}">
+    <form method="POST" action="{{ url_for('index') }}">
   <label for="codigo">Código EAN-13:</label>
   <input type="text" id="codigo" name="codigo" required>
 
@@ -29,18 +29,32 @@
     <label><input type="radio" name="modo" value="Floricultura" checked> Floricultura</label>
     <label><input type="radio" name="modo" value="FLV"> FLV</label>
   </fieldset>
-
-  <label for="copies" style="margin-top:10px;">Cópias (1–100):</label>
-  <input 
-    type="number" 
-    id="copies" 
-    name="copies" 
-    value="1" 
-    min="1" 
-    max="100" 
-    required
-    style="width:60px;"
-  >
+<div class="form-inline">
+  <div class="form-group">
+    <label for="copies">Cópias (1–100):</label>
+    <input 
+      type="number" 
+      id="copies" 
+      name="copies" 
+      value="1" 
+      min="1" max="100" required
+    >
+  </div>
+  <div class="form-group">
+<label for="printer_ip">Impressora:</label>
+<select name="printer_ip" id="printer_ip" required>
+  {% if printers %}
+    {% for printer in printers %}
+      <option value="{{ printer.ip }}">
+        {{ printer.nome or printer.ip }}
+      </option>
+    {% endfor %}
+  {% else %}
+    <option disabled>Nenhuma impressora disponível</option>
+  {% endif %}
+</select>
+  </div>
+</div>
 
   <div style="margin-top:15px;">
     <button type="submit" name="action" value="print">Imprimir</button>

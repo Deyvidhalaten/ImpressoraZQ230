@@ -59,7 +59,7 @@
   <thead>
     <tr>
       <th>Loja</th>
-      <th>Padrão IP</th>
+      <th>Nome</th>
       <th>Função</th>
       <th>IP da Impressora</th>
       <th>LS Flor</th>
@@ -71,7 +71,7 @@
     {% for m in mappings %}
     <tr>
       <td>{{ m.loja }}</td>
-      <td>{{ m.pattern }}</td>
+      <td>{{ m.nome}}</td>
       <td>
         {{ m.funcao | join(', ') }}
       </td>
