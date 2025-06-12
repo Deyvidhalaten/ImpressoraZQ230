@@ -574,24 +574,33 @@ def printers():
 
     if request.method == "POST":
         action_type = request.form.get("action", "save")  # “save” por padrão ou “delete”
-
-        # —— Excluir mapeamento ——
+        
         if action_type == "delete":
             pattern_to_delete = request.form.get("pattern")
-            # busca o mapeamento antes de remover, para log
-            m_antigo = next((m for m in mappings if m["pattern"] == pattern_to_delete), None)
+            ip_to_delete      = request.form.get("ip")
+            # busca o mapeamento exato antes de remover, para log
+            m_antigo = next(
+              (m for m in mappings
+              if m["pattern"] == pattern_to_delete
+              and m["ip"]      == ip_to_delete),
+              None
+            )
             if m_antigo:
-                mappings = [m for m in mappings if m["pattern"] != pattern_to_delete]
+                # remove somente essa entrada (mesmo padrão + mesmo IP)
+                mappings = [
+                     m for m in mappings
+                     if not (m["pattern"] == pattern_to_delete and m["ip"] == ip_to_delete) 
+                ]
                 save_printer_map(mappings)
                 append_log(
                     evento="mapping_delete",
                     ip=request.remote_addr,
-                    impressora=m_antigo.get("driver",""),
-                    detalhes=f"loja={m_antigo['loja']}, pattern={pattern_to_delete}"
+                    impressora=m_antigo.get("nome", m_antigo.get("ip","")),
+                    detalhes=f"loja={m_antigo['loja']}, ip={ip_to_delete}"
                 )
-                flash(f"🗑️ Mapeamento '{pattern_to_delete}' excluído com sucesso!", "success")
+                flash(f"🗑️ Impressora {ip_to_delete} excluída com sucesso!", "success")
             else:
-                flash("❌ Mapeamento não encontrado para exclusão.", "error")
+                flash("❌ Impressora não encontrada para exclusão.", "error")
             return redirect(url_for("printers"))
 
         # —— Adicionar ou editar mapeamento ——
