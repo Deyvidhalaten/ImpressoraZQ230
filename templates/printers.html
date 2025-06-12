@@ -72,7 +72,9 @@
     <tr>
       <td>{{ m.loja }}</td>
       <td>{{ m.pattern }}</td>
-      <td>{{ m.funcao or '—' }}</td>
+      <td>
+        {{ m.funcao | join(', ') }}
+      </td>
       <td>{{ m.ip or '—' }}</td>
       <td>{{ m.ls_flor }}</td>
       <td>{{ m.ls_flv }}</td>
@@ -92,8 +94,15 @@
   <label>Loja:</label>
   <input name="loja" type="number" min="1" max="99" required>
 
-  <label>Função:</label>
-  <input name="funcao" type="text">
+  <label>Nome da Impressora:</label>
+  <input name="nome" type="text" required placeholder="Ex: Zebra Frente">
+
+  <label>Selecine sua(s) Funçõe(s):</label>
+  <select name="funcao" multiple size="3" required>
+    <option value="Floricultura">Floricultura</option>
+    <option value="FLV">FLV</option>
+    <option value="Estoque Padaria">Estoque Padaria</option>
+  </select>
 
   <label>IP da Impressora:</label>
   <input name="ip" type="text" placeholder="Ex: 10.4.30.116" required>

@@ -70,13 +70,17 @@ def load_printer_map():
     with open(PRINTERS_CSV, newline='', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
+            raw = row.get('funcao', '').strip()
+            # Se houver algo, split em lista; caso contrário lista vazia
+            func_list = raw.split(';') if raw else []
             maps.append({
-                'loja':    row['loja'],
-                'pattern': row['pattern'],
-                'funcao':  row.get('funcao',''),
-                'ip':      row.get('ip',''),
-                'ls_flor': int(row.get('ls_flor', 0)),
-                'ls_flv':  int(row.get('ls_flv', 0)),
+                'loja':    row.get('loja', ''),
+                'pattern': row.get('pattern', ''),
+                'nome':    row.get('nome',''),
+                'funcao':  func_list,
+                'ip':      row.get('ip', ''),
+                'ls_flor': int(row.get('ls_flor') or 0),
+                'ls_flv':  int(row.get('ls_flv')  or 0),
             })
     return maps
 
@@ -279,53 +283,10 @@ def resolve_printer_name(requested_name: str) -> str:
     raise RuntimeError(f"Impressora não encontrada: '{requested_name}'")
 
 # --- Impressão via driver Zebra usando ImageWin ---
-""""""
+
 Y_OFFSET = -50
 PRINTER_NAME = "ZDesigner ZD230-203dpi ZPL"
 
-"""
-def print_image_via_driver(image_path: str, x_offset: int, printer_name: str, copies: int = 1):
-
-    #Imprime um PNG via driver Zebra, ajustando o PaperLength
-    #para empilhar 'copies' etiquetas num único job GDI.
-
-    # 1) Reaplica LS antes do job (se necessário)
-    disable_reset_and_set_ls(ls_value=abs(x_offset), printer_name=printer_name)
-
-    # 2) Abre a impressora, lê e ajusta o DEVMODE
-    hPrinter = win32print.OpenPrinter(printer_name)
-    try:
-        prn_info = win32print.GetPrinter(hPrinter, 2)  
-        devmode   = prn_info['pDevMode']         
-
-        # define o número de cópias e marca o campo
-        devmode.Copies = copies
-        devmode.Fields |= win32con.DM_COPIES
-
-        # grava de volta no spooler
-        prn_info['pDevMode'] = devmode
-        win32print.SetPrinter(hPrinter, 2, prn_info, 0)
-    finally:
-        win32print.ClosePrinter(hPrinter)
-
-    # 3) Cria o DC GDI COM o DEVMODE modificado
-    #    assinatura global: CreateDC(driverName, deviceName, output, pDevMode)
-    hDC = win32ui.CreateDC("WINSPOOL", printer_name, None, devmode)
-
-    # 4) Aplica deslocamento e inicia o documento
-    hDC.SetViewportOrg((x_offset, Y_OFFSET))
-    hDC.StartDoc("Etiqueta")
-    hDC.StartPage()
-
-    # 5) Desenha a imagem
-    img = Image.open(image_path)
-    dib = ImageWin.Dib(img)
-    dib.draw(hDC.GetHandleOutput(), (0, 0, img.size[0], img.size[1]))
-
-    # 6) Finaliza o job
-    hDC.EndPage()
-    hDC.EndDoc()
-"""
 # --- Envio legado ZPL ---
 def enviar_para_impressora(zpl: str) -> bool:
     try:
@@ -488,116 +449,90 @@ def gerar_zpl_template(texto: str, codprod: str, ean: str, copies:int , ls:int) 
 
 
 # --- Rota principal ---
-@app.route("/", methods=["GET","POST"])
+@app.route("/", methods=["GET", "POST"])
 def index():
+    # 1) Carrega todos os mapeamentos
+    mappings  = load_printer_map()
+    client_ip = request.remote_addr
+
+    # 2) Identifica o registro da loja pelo IP do cliente
+    loja_map = next(
+        (m for m in mappings if fnmatch.fnmatch(client_ip, m['pattern'])),
+        None
+    )
+    if not loja_map:
+        flash("❌ Loja não cadastrada — contate o administrador.", "error")
+        return render_template("index.html", printers=[])
+
+    # 3) Lê modo e filtra as impressoras habilitadas para esse modo
+    modo     = request.form.get("modo", "Floricultura")
+    printers = [m for m in mappings if m['loja'] == loja_map['loja'] and modo in m['funcao']]
+
     if request.method == "POST":
-        codigo = request.form.get("codigo","").strip()
-        modo   = request.form.get("modo","Floricultura")
-        action = request.form.get("action","print")
+        action     = request.form.get("action", "print")
+        sel_ip     = request.form.get("printer_ip")  # IP escolhido no <select>
+        printer_ip = sel_ip or loja_map['ip']
 
-        # --- Identifica qual mapeamento (loja) corresponde ao IP solicitante ---
-        mappings  = load_printer_map()
-        client_ip = request.remote_addr
-         # --- Identifica qual mapeamento (loja) corresponde ao IP solicitante ---
-        loja_map = next(
-            (m for m in mappings if fnmatch.fnmatch(client_ip, m['pattern'])),
-            None
-        )
-        
-
-        # --- Se não estiver cadastrado, avisa e não faz nada além disso ---
-        if loja_map is None:
-            flash("❌ Loja não cadastrada — contate o administrador.", "error")
-            return render_template("index.html")
-
-        # extrai driver e margens configuradas para esta loja
-        driver_for_request = loja_map.get("loja")
-        ls_flor = loja_map.get("ls_flor", DEFAULT_LS_FLOR)
-        ls_flv  = loja_map.get("ls_flv",  DEFAULT_LS_FLV)
-        
-        # --- Carregar carga via ZPL ---
         if action == "load":
-            ls = ls_flor if modo=="Floricultura" else ls_flv
+            # Reenvia carga de LS à impressora escolhida
+            ls  = loja_map['ls_flor'] if modo=="Floricultura" else loja_map['ls_flv']
+            zpl = f"^XA\n^MD30\n^LS{ls}\n^XZ"
+            ok  = enviar_para_impressora_ip(zpl, printer_ip)
+            if ok:
+                flash(f"✅ Carga '{modo}' (LS={ls}) enviada para {printer_ip}", "success")
+            else:
+                flash(f"❌ Falha de comunicação com {printer_ip}", "error")
+            return render_template("index.html", printers=printers)
 
-            flash(f"✅ Carga '{modo}' (LS={ls}) enviada!", "success")
-            return render_template("index.html")
-
-        # --- Imprimir via driver Windows/GDI ---
         if action == "print":
-            # se o driver não existir, avisa e sai
-            if not driver_for_request:
-                flash("❌ Nenhum driver configurado para sua loja.", "error")
-                return render_template("index.html")
-
-            # lê e valida número de cópias
+            # 4) Validações básicas
             try:
-                copies = int(request.form.get("copies","1"))
+                copies = max(1, min(int(request.form.get("copies","1")), 100))
             except ValueError:
                 copies = 1
-            copies = max(1, min(copies, 100))
 
-            if modo == "FLV":
-                flash("❌ Impressão desabilitada em modo FLV", "error")
-                return render_template("index.html")
-
+            codigo = request.form.get("codigo","").strip()
             if not validou_codigo(codigo):
-                flash("❌ Produto não encontrado", "error")
-                return render_template("index.html")
+                flash("❌ Código inválido ou não encontrado", "error")
+                return render_template("index.html", printers=printers)
 
-            # busca no DB
+            # 5) Busca no DB
             chave = codigo.split("-",1)[0]
-            if len(chave) == 13:
-                rec = DB.get(chave)
-            else:
-                rec = next((v for v in DB.values() if v['codprod'].startswith(chave)), None)
-
+            rec = DB.get(chave) if len(chave)==13 else next((v for v in DB.values() if v['codprod'].startswith(chave)), None)
             if not rec:
                 flash("❌ Produto não encontrado", "error")
-                return render_template("index.html")
+                return render_template("index.html", printers=printers)
 
-            # escolhe margem e offset
-            ls   = ls_flor if modo=="Floricultura" else ls_flv
-
-            #Gerar dados para o ZPL
-            descricao = rec['descricao']    # Pesquisa Descrição
-            codprod = rec['codprod']        # Codigo Reduzido
-            ean = rec['ean']                # Codigo EAN
-            copies = max(1, min(int(request.form.get("copies","1")), 10000))  #Copias
-            
-            printer_ip = loja_map.get("ip", DEFAULT_IP)
-            printer_port = DEFAULT_PORTA
-            zpl = gerar_zpl_template(descricao,codprod,ean,copies,ls)
-
+            # 6) Gera e envia ZPL
+            zpl = gerar_zpl_template(
+                texto    = rec['descricao'],
+                codprod  = rec['codprod'],
+                ean      = rec['ean'],
+                copies   = copies,
+                ls       = (loja_map['ls_flor'] if modo=="Floricultura" else loja_map['ls_flv'])
+            )
             try:
-                
-                printer = ZQ230Printer(host=printer_ip, port=printer_port)
+                printer = ZQ230Printer(host=printer_ip, port=PORTA_IMPRESSORA)
                 printer.print_label(zpl)
-
-                # 2) registra apenas 1 log
                 append_log(
-                   evento="print",
-                   ip=client_ip,
-                   impressora=driver_for_request,
-                   detalhes=(
-                       f"ean={rec['ean']}, codprod={rec['codprod']}, "
-                       f"copies={copies}, modo={modo}, LS={ls}"
-                   ) 
+                    evento="print",
+                    ip=client_ip,
+                    impressora=printer_ip,
+                    detalhes=f"ean={rec['ean']}, codprod={rec['codprod']}, copies={copies}, modo={modo}"
                 )
-
-                flash(f"✅ {copies} cópia(s) impressa(s) via '{driver_for_request}'", "success")
+                flash(f"✅ {copies} etiqueta(s) enviada(s) para {printer_ip}", "success")
             except Exception as e:
-                ##Logs
                 append_log(
                     evento="print_error",
                     ip=client_ip,
-                    impressora=driver_for_request,
+                    impressora=printer_ip,
                     detalhes=f"erro={e}"
                 )
-                flash(f"❌ Erro ao imprimir: {e}", "error")
-            return render_template("index.html")
+                flash(f"❌ Erro ao imprimir em {printer_ip}: {e}", "error")
 
-    # rota GET: apenas exibe o formulário, sem checar nada
-    return render_template("index.html")
+            return render_template("index.html", printers=printers)
+
+    return render_template("index.html", printers=printers)
 
 def send_ls_config(modo: str):
     """Envia o ^LS configurado na impressora para preservar a margem."""
@@ -649,7 +584,7 @@ def printers():
 
         # —— Adicionar ou editar mapeamento ——
         loja   = request.form.get('loja','').strip()
-        funcao = request.form.get('funcao','').strip()
+        funcao_list = request.form.getlist("funcao")
         ip = request.form.get('ip','').strip()
         ls_flor = request.form.get('ls_flor','').strip()
         ls_flv  = request.form.get('ls_flv','').strip()
@@ -658,7 +593,10 @@ def printers():
         if not loja.isdigit() :
             flash("❌ Loja e driver são obrigatórios", "error")
             return redirect(url_for('printers'))
-
+        # Validações
+        if not loja.isdigit() or not funcao_list:
+            flash("❌ Loja e pelo menos uma Função são obrigatórios", "error")
+            return redirect(url_for('printers'))
         try:
             ls_flor_val = int(ls_flor)
             ls_flv_val  = int(ls_flv)
@@ -671,10 +609,10 @@ def printers():
         updated = False
 
         for m in mappings:
-            if m['pattern'] == pattern:
+            if m['loja'] == loja and m['ip'] == ip_str:
                 # antes de alterar, guardo estado antigo
                 m_antigo = m.copy()
-                m['funcao']  = funcao
+                m['funcao']  = funcao_list
                 m['ip'] = ip_str
                 m['ls_flor'] = ls_flor_val
                 m['ls_flv']  = ls_flv_val
@@ -694,12 +632,13 @@ def printers():
         if not updated:
             novo = {
                 'loja':    loja,
+                'pattern': pattern,
                 'ip':      ip_str,
-                'funcao':  funcao,
+                'funcao':  funcao_list,
                 'ls_flor': ls_flor_val,
                 'ls_flv':  ls_flv_val
             }
-        mappings.append(novo)
+            mappings.append(novo)
         append_log(
            evento="mapping_add",
            ip=request.remote_addr,
@@ -715,16 +654,19 @@ def printers():
     # GET: renderiza a página normalmente
     return render_template("printers.html", mappings=mappings)
 
+
 def save_printer_map(mappings):
-    fieldnames = ['loja','pattern','driver','funcao','ip','ls_flor','ls_flv']
+    fieldnames = ['loja','pattern','funcao','ip','ls_flor','ls_flv']
     with open(PRINTERS_CSV, 'w', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         for m in mappings:
+            funcs = m.get('funcao') or []
             writer.writerow({
-                'loja':    m['loja'],
-                'pattern': m['pattern'],
-                'funcao':  m.get('funcao',''),
+                'loja':    m.get('loja',''),
+                'pattern': m.get('pattern',''),
+                'nome':    m.get('nome',''),
+                'funcao':  ';'.join(funcs),
                 'ip':      m.get('ip',''),
                 'ls_flor': m.get('ls_flor',0),
                 'ls_flv':  m.get('ls_flv',0),

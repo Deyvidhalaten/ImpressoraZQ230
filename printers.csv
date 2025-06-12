@@ -1,3 +1,2 @@
-loja,pattern,driver,funcao,ip,ls_flor,ls_flv
-4,10.4.*,,Floricultura,10.4.30.116,80,10
-17,10.17.*,,floricultura,10.17.30.119,50,0
+loja,pattern,funcao,ip,ls_flor,ls_flv
+4,10.4.*,Floricultura;FLV,10.4.30.116,80,10
