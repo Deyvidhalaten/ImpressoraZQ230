@@ -767,7 +767,7 @@ if __name__ == "__main__":
     append_log(evento="startup")
     try:
     # host='0.0.0.0' faz o Flask aceitar conexões de qualquer IP da sua LAN
-      app.run(host="10.17.30.2", port=8000, debug=False, use_reloader=False)
+      app.run(host="0.0.0.0", port=8000, debug=False, use_reloader=False)
     finally:
         append_log(evento="shutdown")
     
