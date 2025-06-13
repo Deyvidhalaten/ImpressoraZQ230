@@ -48,7 +48,23 @@ LS_FLOR_VALUE    = DEFAULT_LS_FLOR
 LS_FLV_VALUE     = DEFAULT_LS_FLV
 
 # --- Carrega base CSV em memória ---
-def load_db():
+def load_db_Flor():
+    db = {}
+    if not os.path.exists(CSV_FILE):
+        return db
+    with open(CSV_FILE, newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            ean    = row['EAN-13'].strip()
+            desc   = row['Descricao'].strip()
+            codprod= row['Cod.Prod'].strip()
+            # indexa pelos dois campos
+            db[ean]     = {'ean': ean, 'descricao': desc, 'codprod': codprod}
+            db[codprod] = {'ean': ean, 'descricao': desc, 'codprod': codprod}
+    return db
+
+# --- Carrega base CSV em memória ---
+##def load_db():
     db = {}
     if not os.path.exists(CSV_FILE):
         return db
@@ -423,11 +439,11 @@ def compose_double_label(label_path: str, gap: int = 140) -> str:
     canvas.save(out_path)
     return out_path
 
-DB = load_db()
+DB = load_db_Flor()
 Y_OFFSET = 50  # fixo vertical
 
 
-def gerar_zpl_template(texto: str, codprod: str, ean: str, copies:int , ls:int) -> str:
+def gerar_zpl_templateFlor(texto: str, codprod: str, ean: str, copies:int , ls:int) -> str:
     
     return f"""
 ^XA 
@@ -448,6 +464,25 @@ def gerar_zpl_template(texto: str, codprod: str, ean: str, copies:int , ls:int) 
 ^XZ
  """
 
+def gerar_zpl_templateFLV(texto: str, infnutri: str, codprod: str, ean: str, validade:int, data:str, copies:int , ls:int) -> str:
+        return f"""
+^XA
+^PRD^FS
+^LS{ls}^FS
+^LH0,0^FS
+^LL100^FS
+^JMA^FS
+^BY2
+^FO90,50^A0N,50,20^FD{texto} ^FS
+^FO90,115^A0N,15,20^FD{infnutri} ^FS
+^FO130,420^A0N,25,20^FD{codprod}-3^FS
+^FO120,440^BEN,50,Y,N^FD{ean}^FS 
+^FO90,540^A0N,40,30^FDValidade: {validade} Dias^FS
+^FO90,605^A0N,40,30^FDProduzido: {data}^FS
+^PQ{copies},0,1,N
+^XZ
+ """
+
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -461,7 +496,12 @@ def index():
         return render_template("index.html", printers=[])
 
     # 2) Determina o modo e lista as impressoras habilitadas
-    modo     = request.form.get("modo", "Floricultura")
+    modo     = request.form.get("modo", "Floricultura") 
+    if modo == "Floricultura":
+        tipoZPL_FLV_FLOR = 1
+    else:
+        tipoZPL_FLV_FLOR = 0
+
     printers = [
        m for m in mappings
        if m['loja'] == loja_map['loja']
@@ -510,15 +550,18 @@ def index():
             if modo not in loja_map['funcao']:
                 flash(f"❌ Impressora selecionada não suporta o modo {modo}", "error")
                 return render_template("index.html", printers=printers)
-
-            ls = loja_map['ls_flor'] if modo == "Floricultura" else loja_map['ls_flv']
-            zpl = gerar_zpl_template(
-                  texto   = rec['descricao'],
+            
+            if tipoZPL_FLV_FLOR == 1:
+                ls = loja_map['ls_flor'] if modo == "Floricultura" else loja_map['ls_flv']
+                zpl = gerar_zpl_templateFlor(
+                    texto   = rec['descricao'],
                     codprod = rec['codprod'],
                     ean     = rec['ean'],
                     copies  = copies,
-                    ls      = loja_map['ls_flor'] if modo=="Floricultura" else loja_map['ls_flv']
-    )
+                    ls      = loja_map['ls_flor'] if modo=="Floricultura" else loja_map['ls_flv'])
+            else:
+                ls = loja_map['ls_flor'] if modo == "Floricultura" else loja_map['ls_flv']
+                zpl = gerar_zpl_templateFLV(ls = loja_map['ls_flv'] if modo=="FLV" else loja_map['ls_flor'])
 
             try:
                 sucesso = enviar_para_impressora_ip(zpl, printer_ip)
