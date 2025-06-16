@@ -221,69 +221,6 @@ def lookup_csv(codigo: str):
                 return row.get('Descricao',''), row.get('Cod.Prod',''), row.get('EAN-13','')
     return '', '', ''
 
-def gerar_barcode_bwip(ean: str) -> str:
-    url = (
-        "https://bwipjs-api.metafloor.com/"
-        f"?bcid=ean13&text={ean}"
-        "&scale=2&height=15&includetext=true&backgroundcolor=FFFFFF"
-    )
-    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-    tmp.close()
-    resp = requests.get(url, verify=False)
-    resp.raise_for_status()
-    with open(tmp.name, "wb") as f:
-        f.write(resp.content)
-    return tmp.name
-
-
-# --- Montagem de etiqueta com texto ---
-def compose_label(ean: str, descricao: str, codprod: str) -> str:
-    # gera o PNG do barcode
-    barcode_png = gerar_barcode_bwip(ean)
-
-    # abre o PNG e cria uma nova imagem um pouco maior para o texto em cima
-    barcode = Image.open(barcode_png)
-    w, h = barcode.size
-    top_margin = 40  # altura reservada para nome+subcódigo
-    label = Image.new("RGB", (w, h + top_margin), "white")
-    label.paste(barcode, (0, top_margin))
-
-    draw = ImageDraw.Draw(label)
-    font = ImageFont.truetype("arial.ttf", size=14)  # ou outro .ttf disponível
-
-    # mede o tamanho do texto da descrição
-    box = draw.textbbox((0, 0), descricao, font=font)  
-    text_w = box[2] - box[0]
-    text_h = box[3] - box[1]
-    # centraliza horizontalmente
-    x_desc = (w - text_w) // 2
-    y_desc = 5
-    draw.text((x_desc, y_desc), descricao, font=font, fill="black")
-
-    # faz o mesmo para o código de produto, logo abaixo da descrição
-    box2 = draw.textbbox((0, 0), codprod, font=font)
-    cp_w = box2[2] - box2[0]
-    x_cp = (w - cp_w) // 2
-    y_cp = y_desc + text_h + 2
-    draw.text((x_cp, y_cp), codprod, font=font, fill="black")
-
-    # salva e retorna caminho
-    out = barcode_png.replace(".png", "_label.png")
-    label.save(out)
-    return out
-
-def resolve_printer_name(requested_name: str) -> str:
-    """
-    Varre as impressoras locais/conectadas e retorna o nome
-    completo da primeira que contenha requested_name (case-insensitive).
-    """
-    flags = win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
-    for _, _, name, _ in win32print.EnumPrinters(flags):
-        if requested_name.lower() in name.lower():
-            return name
-    raise RuntimeError(f"Impressora não encontrada: '{requested_name}'")
-
-# --- Impressão via driver Zebra usando ImageWin ---
 
 Y_OFFSET = -50
 PRINTER_NAME = "ZDesigner ZD230-203dpi ZPL"
@@ -357,71 +294,6 @@ def get_driver_for_ip(client_ip: str, mappings: list[dict]) -> str:
             return m['driver']
     # fallback para a impressora padrão
     return win32print.GetDefaultPrinter()
-
-def disable_reset_and_set_ls(ls_value: int, printer_name: str = None):
-    """
-    1) Envia um bloco PJL que desliga o reset automático do driver (SET RESET=OFF)
-    2) Em seguida envia um bloco ZPL para aplicar ^MD30 e o ^LS desejado
-    Tudo em um único job RAW, de forma que o driver preserve o LS.
-    """
-    # PJL para desabilitar reset automático
-    pjl = b'\x1b%-12345X@PJL SET RESET=OFF\r\n\x1b%-12345X\r\n'
-    # ZPL para atualizar a margem esquerda (LS) permanentemente
-    zpl = f"^XA^MD30^LS{ls_value}^XZ\r\n".encode("ascii")
-    # Junta PJL + ZPL e envia
-    print_raw_zpl(pjl + zpl, printer_name)
-
-# --- Compor imagem final com texto acima ---
-def compose_label(barcode_path: str, descricao: str, codprod: str) -> str:
-    # Carrega o código de barras
-    img = Image.open(barcode_path)
-    largura, altura = img.size
-
-    # Espaço extra no topo para texto
-    padding_top = 40
-    nova = Image.new("RGB", (largura, altura + padding_top), "white")
-    draw = ImageDraw.Draw(nova)
-    font = ImageFont.truetype("arial.ttf", 14)
-
-    # 1) Desenha a descrição no topo
-    bbox = draw.textbbox((0, 0), descricao, font=font)
-    text_w = bbox[2] - bbox[0]
-    text_h = bbox[3] - bbox[1]
-    x = (largura - text_w) // 2
-    y = 5
-    draw.text((x, y), descricao, fill="black", font=font)
-
-    # 2) Desenha o código do produto logo abaixo
-    cod_text = f"Código: {codprod}"
-    bbox2 = draw.textbbox((0, 0), cod_text, font=font)
-    c_w = bbox2[2] - bbox2[0]
-    c_h = bbox2[3] - bbox2[1]
-    x2 = (largura - c_w) // 2
-    y2 = y + text_h + 5
-    draw.text((x2, y2), cod_text, fill="black", font=font)
-
-    # 3) Cola o código de barras abaixo do texto
-    nova.paste(img, (0, padding_top))
-
-    # Salva e retorna o caminho da imagem composta
-    out_path = barcode_path.replace(".png", "_label.png")
-    nova.save(out_path)
-    return out_path
-
-def compose_double_label(label_path: str, gap: int = 140) -> str:
-    img = Image.open(label_path)
-    w, h = img.size
-
-    # canvas com largura = 2×w + gap
-    canvas = Image.new("RGB", (2*w + gap, h), "white")
-    # primeira etiqueta colada à esquerda
-    canvas.paste(img, (0, 0))
-    # segunda etiqueta colada após w + gap pixels
-    canvas.paste(img, (w + gap, 0))
-
-    out_path = label_path.replace("_label.png", f"_double_{gap}px_gap.png")
-    canvas.save(out_path)
-    return out_path
 
 DB = load_db()
 Y_OFFSET = 50  # fixo vertical
@@ -546,12 +418,6 @@ def index():
     # 4) GET ou sem ação: exibe formulário
     return render_template("index.html", printers=printers)
 
-def send_ls_config(modo: str):
-    """Envia o ^LS configurado na impressora para preservar a margem."""
-    ls = LS_FLOR_VALUE if modo == 'Floricultura' else LS_FLV_VALUE
-    disable_reset_and_set_ls(ls, printer_name=PRINTER_NAME)
-    flash(f"🔄 Margem (LS={ls}) reenviada antes da impressão", "info")
-
 # --- Login / Logout / Settings ---
 @app.route("/login", methods=["GET","POST"])
 def login():
@@ -627,7 +493,7 @@ def printers():
             flash("❌ Valores de LS inválidos", "error")
             return redirect(url_for('printers'))
 
-        pattern = f"10.{int(loja)}.*"  # armazenamos “10.<loja>.*” para coincidir com qualquer “10.X.”
+        pattern = f"10.{int(loja)}.*"  # armazena “10.<loja>.*” para coincidir com qualquer “10.X.”
         updated = False
 
         for m in mappings:
