@@ -205,23 +205,6 @@ def validou_codigo(codigo: str) -> bool:
         )
 
 
-def lookup_csv(codigo: str):
-    # retorna (descricao, codprod, ean13)
-    chave = codigo.split('-', 1)[0]
-    print(chave)
-    with open(CSV_FILE, newline='', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            # busca exata por EAN-13
-            if len(chave) == 13 and row.get('EAN-13') == chave:
-                return row.get('Descricao',''), row.get('Cod.Prod',''), row.get('EAN-13','')
-            # busca por código reduzido
-            print("Chave 1: "+chave+" Chave 2: "+row.get)
-            if len(chave) < 13 and row.get('Cod.Prod') == chave:
-                return row.get('Descricao',''), row.get('Cod.Prod',''), row.get('EAN-13','')
-    return '', '', ''
-
-
 Y_OFFSET = -50
 PRINTER_NAME = "ZDesigner ZD230-203dpi ZPL"
 
@@ -235,65 +218,6 @@ def enviar_para_impressora(zpl: str) -> bool:
     except Exception as e:
         print("Erro ao enviar ZPL:", e)
         return False
-
-def stack_labels(label_path: str, copies: int) -> str:
-    """
-    Lê a imagem única de etiqueta em label_path e
-    cria uma nova imagem com 'copies' etiquetas empilhadas verticalmente.
-    Retorna o caminho da imagem empilhada.
-    """
-    img   = Image.open(label_path)
-    w, h  = img.size
-    canvas = Image.new("RGB", (w, h * copies), "white")
-    for i in range(copies):
-        canvas.paste(img, (0, i * h))
-    out_path = label_path.replace(".png", f"_stack_{copies}.png")
-    canvas.save(out_path)
-    return out_path
-
-def print_raw_zpl(zpl_bytes: bytes, printer_name: str = None):
-    """
-    Envia bytes RAW (PJL+ZPL) diretamente para a fila, sem passar
-    pelo GDI, portanto o driver não injeta nenhum reset.
-    """
-    if printer_name is None:
-        printer_name = win32print.GetDefaultPrinter()
-    h = win32print.OpenPrinter(printer_name,
-    {"DesiredAccess": win32print.PRINTER_ACCESS_USE})
-    try:
-        win32print.StartDocPrinter(h, 1, ("RAW_ZPL", None, "RAW"))
-        win32print.StartPagePrinter(h)
-        win32print.WritePrinter(h, zpl_bytes)
-        win32print.EndPagePrinter(h)
-        win32print.EndDocPrinter(h)
-    finally:
-        win32print.ClosePrinter(h)
-
-def load_ls(modo: str):
-    """
-    Reenvia a carga de LS (margem esquerda) exata que o botão 'Enviar Carga' usa,
-    garantindo que a impressora volte ao LS configurado antes de cada impressão.
-    """
-    ls = LS_FLOR_VALUE if modo == 'Floricultura' else LS_FLV_VALUE
-    zpl = f"^XA\n^MD30\n^LS{ls}\n^XZ"
-    ok = enviar_para_impressora(zpl)
-    if not ok:
-        flash(f"❌ Falha ao recarregar LS antes da impressão (LS={ls})", "error")
-    else:
-        flash(f"🔄 LS recarregado (LS={ls}) antes da impressão", "info")
-
-def get_driver_for_ip(client_ip: str, mappings: list[dict]) -> str:
-    """
-    percorre mappings (vindo de load_printer_map())
-    e retorna o primeiro 'driver' cujo 'pattern' case com client_ip.
-    Ex: pattern="10.17*" casa com client_ip="10.17.30.5".
-    """
-    for m in mappings:
-        prefix = m['pattern'].rstrip('*')
-        if client_ip.startswith(prefix):
-            return m['driver']
-    # fallback para a impressora padrão
-    return win32print.GetDefaultPrinter()
 
 DB = load_db()
 Y_OFFSET = 50  # fixo vertical
@@ -389,16 +313,15 @@ def index():
                     codprod = rec['codprod'],
                     ean     = rec['ean'],
                     copies  = copies,
-                    ls      = loja_map['ls_flor'] if modo=="Floricultura" else loja_map['ls_flv']
-    )
+                    ls      = loja_map['ls_flor'] if modo=="Floricultura" else loja_map['ls_flv'])
 
             try:
                 sucesso = enviar_para_impressora_ip(zpl, printer_ip)
                 if sucesso:
                     append_log(
-                        evento="print",
+                        evento="Impressão",
                         ip=client_ip,
-                        impressora=printer_ip,
+                        impressora=loja_map['loja'],
                         detalhes=f"ean={rec['ean']}, codprod={rec['codprod']}, copies={copies}, modo={modo}"
                     )
                     flash(f"✅ {copies} etiqueta(s) enviada(s) para {printer_ip}", "success")
@@ -406,7 +329,7 @@ def index():
                     flash(f"❌ Falha de comunicação com {printer_ip}", "error")
             except Exception as e:
                 append_log(
-                    evento="print_error",
+                    evento="Erro na Impressão",
                     ip=client_ip,
                     impressora=printer_ip,
                     detalhes=f"erro={e}"
