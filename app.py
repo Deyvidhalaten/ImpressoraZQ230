@@ -5,17 +5,15 @@ ssl._create_default_https_context = ssl._create_unverified_context
 import sys
 import os
 import socket
-import tempfile
 import urllib3
-import requests
 import csv
 
 from PIL import Image
-import win32print  # type: ignore
+
 
 from printer_zq230 import ZQ230Printer  #  Módulo de socket/ZPL
 from datetime import datetime, timedelta
-from PIL import Image, ImageWin, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont
 from flask import (
     Flask, render_template, request, redirect,
     flash, session, url_for
@@ -47,7 +45,7 @@ PORTA_IMPRESSORA = DEFAULT_PORTA
 LS_FLOR_VALUE    = DEFAULT_LS_FLOR
 LS_FLV_VALUE     = DEFAULT_LS_FLV
 
-# --- Carrega base CSV em memória ---
+# --- Carrega base CSV Flor em memória ---
 def load_db_Flor():
     db = {}
     if not os.path.exists(CSV_FILE):
@@ -63,8 +61,8 @@ def load_db_Flor():
             db[codprod] = {'ean': ean, 'descricao': desc, 'codprod': codprod}
     return db
 
-# --- Carrega base CSV em memória ---
-##def load_db():
+# --- Carrega base CSV FLV em memória ---
+def load_db_FLV():
     db = {}
     if not os.path.exists(CSV_FILE):
         return db
@@ -220,228 +218,10 @@ def validou_codigo(codigo: str) -> bool:
             for v in DB.values()
         )
 
-
-def lookup_csv(codigo: str):
-    # retorna (descricao, codprod, ean13)
-    chave = codigo.split('-', 1)[0]
-    print(chave)
-    with open(CSV_FILE, newline='', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            # busca exata por EAN-13
-            if len(chave) == 13 and row.get('EAN-13') == chave:
-                return row.get('Descricao',''), row.get('Cod.Prod',''), row.get('EAN-13','')
-            # busca por código reduzido
-            print("Chave 1: "+chave+" Chave 2: "+row.get)
-            if len(chave) < 13 and row.get('Cod.Prod') == chave:
-                return row.get('Descricao',''), row.get('Cod.Prod',''), row.get('EAN-13','')
-    return '', '', ''
-
-def gerar_barcode_bwip(ean: str) -> str:
-    url = (
-        "https://bwipjs-api.metafloor.com/"
-        f"?bcid=ean13&text={ean}"
-        "&scale=2&height=15&includetext=true&backgroundcolor=FFFFFF"
-    )
-    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-    tmp.close()
-    resp = requests.get(url, verify=False)
-    resp.raise_for_status()
-    with open(tmp.name, "wb") as f:
-        f.write(resp.content)
-    return tmp.name
-
-
-# --- Montagem de etiqueta com texto ---
-def compose_label(ean: str, descricao: str, codprod: str) -> str:
-    # gera o PNG do barcode
-    barcode_png = gerar_barcode_bwip(ean)
-
-    # abre o PNG e cria uma nova imagem um pouco maior para o texto em cima
-    barcode = Image.open(barcode_png)
-    w, h = barcode.size
-    top_margin = 40  # altura reservada para nome+subcódigo
-    label = Image.new("RGB", (w, h + top_margin), "white")
-    label.paste(barcode, (0, top_margin))
-
-    draw = ImageDraw.Draw(label)
-    font = ImageFont.truetype("arial.ttf", size=14)  # ou outro .ttf disponível
-
-    # mede o tamanho do texto da descrição
-    box = draw.textbbox((0, 0), descricao, font=font)  
-    text_w = box[2] - box[0]
-    text_h = box[3] - box[1]
-    # centraliza horizontalmente
-    x_desc = (w - text_w) // 2
-    y_desc = 5
-    draw.text((x_desc, y_desc), descricao, font=font, fill="black")
-
-    # faz o mesmo para o código de produto, logo abaixo da descrição
-    box2 = draw.textbbox((0, 0), codprod, font=font)
-    cp_w = box2[2] - box2[0]
-    x_cp = (w - cp_w) // 2
-    y_cp = y_desc + text_h + 2
-    draw.text((x_cp, y_cp), codprod, font=font, fill="black")
-
-    # salva e retorna caminho
-    out = barcode_png.replace(".png", "_label.png")
-    label.save(out)
-    return out
-
-def resolve_printer_name(requested_name: str) -> str:
-    """
-    Varre as impressoras locais/conectadas e retorna o nome
-    completo da primeira que contenha requested_name (case-insensitive).
-    """
-    flags = win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
-    for _, _, name, _ in win32print.EnumPrinters(flags):
-        if requested_name.lower() in name.lower():
-            return name
-    raise RuntimeError(f"Impressora não encontrada: '{requested_name}'")
-
 # --- Impressão via driver Zebra usando ImageWin ---
-
-Y_OFFSET = -50
-PRINTER_NAME = "ZDesigner ZD230-203dpi ZPL"
-
-# --- Envio legado ZPL ---
-def enviar_para_impressora(zpl: str) -> bool:
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((IP_IMPRESSORA, PORTA_IMPRESSORA))
-            s.sendall(zpl.encode('latin1'))
-        return True
-    except Exception as e:
-        print("Erro ao enviar ZPL:", e)
-        return False
-
-def stack_labels(label_path: str, copies: int) -> str:
-    """
-    Lê a imagem única de etiqueta em label_path e
-    cria uma nova imagem com 'copies' etiquetas empilhadas verticalmente.
-    Retorna o caminho da imagem empilhada.
-    """
-    img   = Image.open(label_path)
-    w, h  = img.size
-    canvas = Image.new("RGB", (w, h * copies), "white")
-    for i in range(copies):
-        canvas.paste(img, (0, i * h))
-    out_path = label_path.replace(".png", f"_stack_{copies}.png")
-    canvas.save(out_path)
-    return out_path
-
-def print_raw_zpl(zpl_bytes: bytes, printer_name: str = None):
-    """
-    Envia bytes RAW (PJL+ZPL) diretamente para a fila, sem passar
-    pelo GDI, portanto o driver não injeta nenhum reset.
-    """
-    if printer_name is None:
-        printer_name = win32print.GetDefaultPrinter()
-    h = win32print.OpenPrinter(printer_name,
-    {"DesiredAccess": win32print.PRINTER_ACCESS_USE})
-    try:
-        win32print.StartDocPrinter(h, 1, ("RAW_ZPL", None, "RAW"))
-        win32print.StartPagePrinter(h)
-        win32print.WritePrinter(h, zpl_bytes)
-        win32print.EndPagePrinter(h)
-        win32print.EndDocPrinter(h)
-    finally:
-        win32print.ClosePrinter(h)
-
-def load_ls(modo: str):
-    """
-    Reenvia a carga de LS (margem esquerda) exata que o botão 'Enviar Carga' usa,
-    garantindo que a impressora volte ao LS configurado antes de cada impressão.
-    """
-    ls = LS_FLOR_VALUE if modo == 'Floricultura' else LS_FLV_VALUE
-    zpl = f"^XA\n^MD30\n^LS{ls}\n^XZ"
-    ok = enviar_para_impressora(zpl)
-    if not ok:
-        flash(f"❌ Falha ao recarregar LS antes da impressão (LS={ls})", "error")
-    else:
-        flash(f"🔄 LS recarregado (LS={ls}) antes da impressão", "info")
-
-def get_driver_for_ip(client_ip: str, mappings: list[dict]) -> str:
-    """
-    percorre mappings (vindo de load_printer_map())
-    e retorna o primeiro 'driver' cujo 'pattern' case com client_ip.
-    Ex: pattern="10.17*" casa com client_ip="10.17.30.5".
-    """
-    for m in mappings:
-        prefix = m['pattern'].rstrip('*')
-        if client_ip.startswith(prefix):
-            return m['driver']
-    # fallback para a impressora padrão
-    return win32print.GetDefaultPrinter()
-
-def disable_reset_and_set_ls(ls_value: int, printer_name: str = None):
-    """
-    1) Envia um bloco PJL que desliga o reset automático do driver (SET RESET=OFF)
-    2) Em seguida envia um bloco ZPL para aplicar ^MD30 e o ^LS desejado
-    Tudo em um único job RAW, de forma que o driver preserve o LS.
-    """
-    # PJL para desabilitar reset automático
-    pjl = b'\x1b%-12345X@PJL SET RESET=OFF\r\n\x1b%-12345X\r\n'
-    # ZPL para atualizar a margem esquerda (LS) permanentemente
-    zpl = f"^XA^MD30^LS{ls_value}^XZ\r\n".encode("ascii")
-    # Junta PJL + ZPL e envia
-    print_raw_zpl(pjl + zpl, printer_name)
-
-# --- Compor imagem final com texto acima ---
-def compose_label(barcode_path: str, descricao: str, codprod: str) -> str:
-    # Carrega o código de barras
-    img = Image.open(barcode_path)
-    largura, altura = img.size
-
-    # Espaço extra no topo para texto
-    padding_top = 40
-    nova = Image.new("RGB", (largura, altura + padding_top), "white")
-    draw = ImageDraw.Draw(nova)
-    font = ImageFont.truetype("arial.ttf", 14)
-
-    # 1) Desenha a descrição no topo
-    bbox = draw.textbbox((0, 0), descricao, font=font)
-    text_w = bbox[2] - bbox[0]
-    text_h = bbox[3] - bbox[1]
-    x = (largura - text_w) // 2
-    y = 5
-    draw.text((x, y), descricao, fill="black", font=font)
-
-    # 2) Desenha o código do produto logo abaixo
-    cod_text = f"Código: {codprod}"
-    bbox2 = draw.textbbox((0, 0), cod_text, font=font)
-    c_w = bbox2[2] - bbox2[0]
-    c_h = bbox2[3] - bbox2[1]
-    x2 = (largura - c_w) // 2
-    y2 = y + text_h + 5
-    draw.text((x2, y2), cod_text, fill="black", font=font)
-
-    # 3) Cola o código de barras abaixo do texto
-    nova.paste(img, (0, padding_top))
-
-    # Salva e retorna o caminho da imagem composta
-    out_path = barcode_path.replace(".png", "_label.png")
-    nova.save(out_path)
-    return out_path
-
-def compose_double_label(label_path: str, gap: int = 140) -> str:
-    img = Image.open(label_path)
-    w, h = img.size
-
-    # canvas com largura = 2×w + gap
-    canvas = Image.new("RGB", (2*w + gap, h), "white")
-    # primeira etiqueta colada à esquerda
-    canvas.paste(img, (0, 0))
-    # segunda etiqueta colada após w + gap pixels
-    canvas.paste(img, (w + gap, 0))
-
-    out_path = label_path.replace("_label.png", f"_double_{gap}px_gap.png")
-    canvas.save(out_path)
-    return out_path
 
 DB = load_db_Flor()
 Y_OFFSET = 50  # fixo vertical
-
 
 def gerar_zpl_templateFlor(texto: str, codprod: str, ean: str, copies:int , ls:int) -> str:
     
@@ -560,8 +340,15 @@ def index():
                     copies  = copies,
                     ls      = loja_map['ls_flor'] if modo=="Floricultura" else loja_map['ls_flv'])
             else:
-                ls = loja_map['ls_flor'] if modo == "Floricultura" else loja_map['ls_flv']
-                zpl = gerar_zpl_templateFLV(ls = loja_map['ls_flv'] if modo=="FLV" else loja_map['ls_flor'])
+                ls = loja_map['ls_flv'] if modo == "FLV" else loja_map['ls_flor']
+                zpl = gerar_zpl_templateFLV(
+                    infnutri   = rec['infnutri'],
+                    codprod = rec['codprod'],
+                    ean     = rec['ean'],
+                    validade     = rec['Validade'],
+                    data = datetime.now().isoformat(sep=" ", timespec="day"),
+                    copies  = copies,
+                    ls = loja_map['ls_flv'] if modo=="FLV" else loja_map['ls_flor'])
 
             try:
                 sucesso = enviar_para_impressora_ip(zpl, printer_ip)
@@ -588,12 +375,6 @@ def index():
 
     # 4) GET ou sem ação: exibe formulário
     return render_template("index.html", printers=printers)
-
-def send_ls_config(modo: str):
-    """Envia o ^LS configurado na impressora para preservar a margem."""
-    ls = LS_FLOR_VALUE if modo == 'Floricultura' else LS_FLV_VALUE
-    disable_reset_and_set_ls(ls, printer_name=PRINTER_NAME)
-    flash(f"🔄 Margem (LS={ls}) reenviada antes da impressão", "info")
 
 # --- Login / Logout / Settings ---
 @app.route("/login", methods=["GET","POST"])
