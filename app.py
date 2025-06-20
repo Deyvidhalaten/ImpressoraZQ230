@@ -294,7 +294,7 @@ def gerar_zpl_templateFLV(
     padded = infnutri + [""] * max(0, MAX_LINHAS - len(infnutri))
 
     lines = [
-        "^XA",
+         "^XA",
         "^PRD^FS",
         f"^LS{ls}^FS",
         "^LH0,0^FS",
@@ -322,8 +322,8 @@ def gerar_zpl_templateFLV(
         # rodapé
         f"^FO130,440^A0N,25,20^FD{codprod}^FS",
         f"^FO120,460^BEN,50,Y,N^FD{ean}^FS",
-        f"^FO90,500^A0N,40,30^FDValidade: {validade} Dias^FS",
-        f"^FO90,540^A0N,40,30^FDProduzido: {data}^FS",
+        f"^FO90,550^A0N,40,30^FDValidade: {validade} Dias^FS",
+        f"^FO90,590^A0N,40,30^FDProduzido: {data}^FS",
         f"^PQ{copies},0,1,N",
         "^XZ",
     ]
