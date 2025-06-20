@@ -8,6 +8,7 @@ import os
 import socket
 import urllib3
 import csv
+import json as _json
 
 from PIL import Image
 
@@ -16,7 +17,7 @@ from printer_zq230 import ZQ230Printer  #  Módulo de socket/ZPL
 from datetime import datetime, timedelta
 from PIL import Image, ImageDraw, ImageFont
 from flask import (
-    Flask, json, render_template, request, redirect,
+    Flask, render_template, request, redirect,
     flash, session, url_for
 )
 
@@ -29,7 +30,7 @@ font = ImageFont.truetype(windows_font, size=14)
 BASE_DIR     = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
 CONFIG_FILE  = os.path.join(BASE_DIR, 'config.txt')
 CSV_FILE     = os.path.join(BASE_DIR, 'baseFloricultura.csv')
-CSV_FILE2     = os.path.join(BASE_DIR, 'baseFariados.csv')
+CSV_FILE2     = os.path.join(BASE_DIR, 'baseFatiados.csv')
 PRINTERS_CSV = os.path.join(BASE_DIR, 'printers.csv')
 LOG_FILE = os.path.join(BASE_DIR, "logs.csv")
 
@@ -68,27 +69,47 @@ def load_db_FLV():
     db = {}
     if not os.path.exists(CSV_FILE2):
         return db
+
     with open(CSV_FILE2, newline='', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
-            ean     = row['EAN-13'].strip()
-            desc    = row['Descricao'].strip()
-            codprod = row['Cod.Prod'].strip()
-            validade= int(row['Validade'].strip())
-            raw     = row['Info.nutricional'].strip()
+            # pega cada coluna de forma segura
+            ean_raw       = (row.get('EAN-13') or '').strip()
+            desc          = (row.get('Descricao') or '').strip()
+            codprod       = (row.get('Cod.Prod') or '').strip()
+            validade_raw  = (row.get('Validade') or '').strip()
+            info_raw      = (row.get('Info.nutricional') or '').strip()
+
+            # se não tiver ean ou codprod válido, pula
+            if not ean_raw or not codprod:
+                continue
+
+            # tenta converter validade
             try:
-                info_list = json.loads(raw)
-            except json.JSONDecodeError:
-                # se não for JSON válido, joga tudo numa única linha
-                info_list = [ raw ]
-            db[ean]     = {
-                'ean': ean,
+                validade = int(validade_raw)
+            except ValueError:
+                validade = None
+
+            # tenta carregar JSON, senão deixa tudo numa única linha
+            try:
+                info_list = _json.loads(info_raw)
+                if not isinstance(info_list, list):
+                    info_list = [info_list]
+            except (_json.JSONDecodeError, TypeError):
+                info_list = [info_raw]
+
+            rec = {
+                'ean': ean_raw,
                 'descricao': desc,
                 'codprod': codprod,
                 'validade': validade,
-                'info_nutri': info_list
+                'info_nutri': info_list,
             }
-            db[codprod] = db[ean]
+
+            # indexa pelos dois campos
+            db[ean_raw]   = rec
+            db[codprod] = rec
+
     return db
 
 def load_printer_map():
@@ -232,7 +253,8 @@ def validou_codigo(codigo: str) -> bool:
             for v in DB.values()
         )
 
-DB = load_db_Flor()
+DB           = load_db_Flor()        # para Floricultura
+DB_FLV       = load_db_FLV()    # para FLV
 Y_OFFSET = 50  # fixo vertical
 
 def gerar_zpl_templateFlor(texto: str, codprod: str, ean: str, copies:int , ls:int) -> str:
@@ -257,51 +279,54 @@ def gerar_zpl_templateFlor(texto: str, codprod: str, ean: str, copies:int , ls:i
  """
 
 
-def gerar_zpl_templateFLV(texto: str,
-                          infnutri_str: str,
-                          codprod: str,
-                          ean: str,
-                          validade: int,
-                          data: str,
-                          copies: int,
-                          ls: int) -> str:
-    # Tenta parsear a string JSON; se já for lista, usa-a diretamente
-    try:
-        inf_list = json.loads(infnutri_str)
-    except (json.JSONDecodeError, TypeError):
-        inf_list = infnutri_str if isinstance(infnutri_str, list) else [infnutri_str]
+def gerar_zpl_templateFLV(
+    texto: str,
+    infnutri: list[str],
+    codprod: str,
+    ean: str,
+    validade: int,
+    data: str,
+    copies: int,
+    ls: int
+) -> str:
+    # Queremos sempre até 16 linhas, mas não dar erro se tiver menos
+    MAX_LINHAS = 16
+    padded = infnutri + [""] * max(0, MAX_LINHAS - len(infnutri))
 
-    lines = []
-    # Cabeçalho e carga de LS
-    lines.append("^XA")
-    lines.append("^PRD^FS")
-    lines.append(f"^LS{ls}^FS")
-    lines.append("^LH0,0^FS")
-    lines.append("^LL100^FS")
-    lines.append("^JMA^FS")
-    lines.append("^BY2")
-
-    # Texto principal
-    lines.append(f"^FO90,50^A0N,50,20^FD{texto}^FS")
-
-    # Informação nutricional: uma linha a cada +20 em Y, começando em 115
-    y0 = 115
-    for i, item in enumerate(inf_list):
-        y = y0 + 20 * i
-        # se quiser limitar largura, pode truncar item aqui
-        lines.append(f"^FO90,{y}^A0N,15,20^FD{item}^FS")
-
-    # Demais campos fixos
-    lines.append(f"^FO130,420^A0N,25,20^FD{codprod}^FS")
-    lines.append(f"^FO120,440^BEN,50,Y,N^FD{ean}^FS")
-    lines.append(f"^FO90,540^A0N,40,30^FDValidade: {validade} Dias^FS")
-    lines.append(f"^FO90,605^A0N,40,30^FDProduzido: {data}^FS")
-
-    # Quantidade de cópias e fim
-    lines.append(f"^PQ{copies},0,1,N")
-    lines.append("^XZ")
-
-    # Junta tudo com quebras de linha
+    lines = [
+        "^XA",
+        "^PRD^FS",
+        f"^LS{ls}^FS",
+        "^LH0,0^FS",
+        "^LL400^FS",      # pra comportar todas as linhas
+        "^JMA^FS",
+        "^BY2",
+        f"^FO90,50^A0N,50,20^FD{texto}^FS",
+        # Na sequência, as 16 linhas de nutrição:
+        f"^FO90,115^A0N,15,20^FD{padded[0]}^FS",
+        f"^FO90,135^A0N,15,20^FD{padded[1]}^FS",
+        f"^FO90,155^A0N,15,20^FD{padded[2]}^FS",
+        f"^FO90,175^A0N,15,20^FD{padded[3]}^FS",
+        f"^FO90,195^A0N,15,20^FD{padded[4]}^FS",
+        f"^FO90,215^A0N,15,20^FD{padded[5]}^FS",
+        f"^FO90,235^A0N,15,20^FD{padded[6]}^FS",
+        f"^FO90,255^A0N,15,20^FD{padded[7]}^FS",
+        f"^FO90,275^A0N,15,20^FD{padded[8]}^FS",
+        f"^FO90,295^A0N,15,20^FD{padded[9]}^FS",
+        f"^FO90,315^A0N,15,20^FD{padded[10]}^FS",
+        f"^FO90,335^A0N,15,20^FD{padded[11]}^FS",
+        f"^FO90,355^A0N,15,20^FD{padded[12]}^FS",
+        f"^FO90,375^A0N,15,20^FD{padded[13]}^FS",
+        f"^FO90,395^A0N,15,20^FD{padded[14]}^FS",
+        f"^FO90,415^A0N,15,20^FD{padded[15]}^FS",
+        # rodapé
+        f"^FO130,440^A0N,25,20^FD{codprod}^FS",
+        f"^FO120,460^BEN,50,Y,N^FD{ean}^FS",
+        f"^FO90,500^A0N,40,30^FDValidade: {validade} Dias^FS",
+        f"^FO90,540^A0N,40,30^FDProduzido: {data}^FS",
+        f"^PQ{copies},0,1,N",
+        "^XZ",
+    ]
     return "\n".join(lines)
 
 
@@ -311,22 +336,17 @@ def index():
     client_ip = request.remote_addr
 
     # 1) Encontra o mapeamento da loja
-    loja_map = next((m for m in mappings if fnmatch.fnmatch(client_ip, m['pattern'])), None)
+    loja_map = next(
+        (m for m in mappings if fnmatch.fnmatch(client_ip, m['pattern'])),
+        None
+    )
     if not loja_map:
         flash("❌ Loja não cadastrada — contate o administrador.", "error")
         return render_template("index.html", printers=[])
 
-    # 2) Determina o modo e lista as impressoras habilitadas
-    modo     = request.form.get("modo", "Floricultura") 
-    if modo == "Floricultura":
-        tipoZPL_FLV_FLOR = 1
-    else:
-        tipoZPL_FLV_FLOR = 0
-
-    printers = [
-       m for m in mappings
-       if m['loja'] == loja_map['loja']
-    ]
+    # 2) Determina o modo e lista as impressoras da loja
+    modo = request.form.get("modo", "Floricultura")
+    printers = [m for m in mappings if m['loja'] == loja_map['loja']]
 
     # 3) Processa POST
     if request.method == "POST":
@@ -347,71 +367,78 @@ def index():
 
         # --- Impressão via ZPL ---
         if action == "print":
-            # valida número de cópias
+            # valida cópias
             try:
                 copies = max(1, min(int(request.form.get("copies", "1")), 100))
             except ValueError:
                 copies = 1
 
+            # valida código
             codigo = request.form.get("codigo", "").strip()
             if not validou_codigo(codigo):
                 flash("❌ Código inválido ou não encontrado", "error")
                 return render_template("index.html", printers=printers)
 
+            # extrai chave para lookup
             chave = codigo.split("-", 1)[0]
-            rec = (
-                DB.get(chave)
-                if len(chave) == 13
-                else next((v for v in DB.values() if v['codprod'].startswith(chave)), None)
-            )
+            # escolhe a base certa conforme o modo
+            if modo == "FLV":
+                rec = DB_FLV.get(chave)
+            else:
+                rec = DB.get(chave)
+
             if not rec:
                 flash("❌ Produto não encontrado", "error")
                 return render_template("index.html", printers=printers)
-            
-            if modo not in loja_map['funcao']:
+
+            # só acessa esses campos quando for FLV
+            if modo == "FLV":
+                infnutri = rec.get('info_nutri', [])   # sem vírgula no final!
+                validade = rec.get('validade')
+            else:
+                infnutri = []
+                validade = None
+
+            # verifica se essa loja suporta o modo
+            # (supondo que você converta funcao em lista)
+            funcao_list = loja_map['funcao']  # ex: ['Floricultura','FLV']
+            if modo not in funcao_list:
                 flash(f"❌ Impressora selecionada não suporta o modo {modo}", "error")
                 return render_template("index.html", printers=printers)
-            
-            if tipoZPL_FLV_FLOR == 1:
-                ls = loja_map['ls_flor'] if modo == "Floricultura" else loja_map['ls_flv']
+
+            # monta o ZPL correto
+            if modo == "Floricultura":
                 zpl = gerar_zpl_templateFlor(
                     texto   = rec['descricao'],
                     codprod = rec['codprod'],
                     ean     = rec['ean'],
                     copies  = copies,
-                    ls      = loja_map['ls_flor'] if modo=="Floricultura" else loja_map['ls_flv'])
-            else:
-                ls = loja_map['ls_flv'] if modo == "FLV" else loja_map['ls_flor']
+                    ls      = loja_map['ls_flor']
+                )
+            else:  # FLV
                 zpl = gerar_zpl_templateFLV(
                     texto    = rec['descricao'],
-                    infnutri = rec['info_nutri'],  
+                    infnutri = infnutri,
                     codprod  = rec['codprod'],
                     ean      = rec['ean'],
-                    validade = rec['validade'],
+                    validade = validade,
                     data     = datetime.now().strftime('%d/%m/%Y'),
                     copies   = copies,
-                    ls       = loja_map['ls_flv'] if modo=="FLV" else loja_map['ls_flor'])
+                    ls       = loja_map['ls_flv']
+                )
 
-            try:
-                sucesso = enviar_para_impressora_ip(zpl, printer_ip)
-                if sucesso:
-                    append_log(
-                        evento="print",
-                        ip=client_ip,
-                        impressora=printer_ip,
-                        detalhes=f"ean={rec['ean']}, codprod={rec['codprod']}, copies={copies}, modo={modo}"
-                    )
-                    flash(f"✅ {copies} etiqueta(s) enviada(s) para {printer_ip}", "success")
-                else:
-                    flash(f"❌ Falha de comunicação com {printer_ip}", "error")
-            except Exception as e:
+            # envia e registra log
+            sucesso = enviar_para_impressora_ip(zpl, printer_ip)
+            if sucesso:
                 append_log(
-                    evento="print_error",
+                    evento="print",
                     ip=client_ip,
                     impressora=printer_ip,
-                    detalhes=f"erro={e}"
+                    detalhes=f"ean={rec['ean']}, codprod={rec['codprod']}, copies={copies}, modo={modo}"
                 )
-                flash(f"❌ Erro ao imprimir em {printer_ip}: {e}", "error")
+                flash(f"✅ {copies} etiqueta(s) enviada(s) para {printer_ip}", "success")
+            else:
+                flash(f"❌ Falha de comunicação com {printer_ip}", "error")
 
             return render_template("index.html", printers=printers)
 

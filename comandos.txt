@@ -1,30 +1,13 @@
 python setup.py build
 pip install pyinstaller
 pip install flask                     # web framework
-pip install requests                  # para chamadas HTTP (bwip-js, se usar)
--pip install pillow                    # manipulação de imagens - Desatualizado
--pip install python-barcode[images]    # gera EAN-13 como PNG - Desatualizado
--pip install pywin32                   # impressão via driver no Windows - Desatualizado
-
+pip install requests                  # para chamadas HTTP (bwip-js)
+pip install windows-curses
 pip install waitress
-Caso de erro ao isntalar o waitress pode ser a versão do python, podes voltar para o 3.11 ou rodar este: 
+
+Caso de erro ao instalar o waitress pode ser a versão do python ou regra AD, podes voltar para o 3.11 ou rodar este: 
 pip install --no-binary :all: waitress
 
-Fazer Regra firewall para rodar: Regra de entrada Sugestão de nomes:
-TC/IP 8000 FlaskServer Impressora
-
 waitress-serve --listen=10.17.30.2:8000 app:app          #Rodar Servidor em LAN
-python app.py  # Roda Localmente
 
-Temporario
-
-Acessar este caminho nos arquivos do windows C:\Windows\System32\drivers\etc\hosts
-
-No final identificar este trecho e inclir o IP 
-# localhost name resolution is handled within DNS itself.
-#	127.0.0.1       localhost
-#	::1             localhost
-
-10.17.30.119    impressao-bistek
-
-Nesta seção incluir quantos IPS necessarios a ideia é que o DNS local aponte impressao-bistek para o IP que está hosteando
+python app.py  # Roda Localmente, mas precisa das dependencias acima
