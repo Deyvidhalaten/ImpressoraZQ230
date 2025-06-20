@@ -2,25 +2,27 @@ import ssl
 import sys, os, glob
 from cx_Freeze import setup, Executable
 
+# Evita warnings SSL do Python
 ssl._create_default_https_context = ssl._create_unverified_context
-# local do pywin32 DLLs
+
+# Local das DLLs do pywin32
 pywin32_system32 = os.path.join(
     sys.base_prefix, "Lib", "site-packages", "pywin32_system32"
 )
 win32_dlls = glob.glob(os.path.join(pywin32_system32, "*.dll"))
 
-# arquivos a incluir na pasta build
+# Arquivos a incluir na pasta build
 includefiles = [
     ("templates", "templates"),
     ("static",   "static"),
     ("baseFloricultura.csv", "baseFloricultura.csv"),
     ("printers.csv",           "printers.csv"),
-    # módulo ZPL
+    # Módulo ZPL
     ("printer_zq230.py",      "printer_zq230.py"),
-    # fonte Arial
-    (os.path.join(os.environ["WINDIR"], "Fonts", "arial.ttf"), "arial.ttf"),
+    # Fonte Arial
+    (os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts", "arial.ttf"), "arial.ttf"),
 ]
-# inclui DLLs do pywin32
+# Inclui DLLs do pywin32
 includefiles += [(dll, os.path.basename(dll)) for dll in win32_dlls]
 
 build_exe_options = {
@@ -28,7 +30,7 @@ build_exe_options = {
         "flask", "jinja2",
         "requests", "urllib3",
         # PIL (Pillow)
-        "PIL", 
+        "PIL",
         # módulos de sistema
         "os", "sys", "socket", "tempfile", "csv", "fnmatch"
     ],
@@ -41,11 +43,13 @@ build_exe_options = {
     ],
     "include_files": includefiles,
     "include_msvcr": True,
+    # Remove geração do arquivo de licença Python para evitar erros de permissão
+    "include_python_license": False,
 }
 
 base = None
 if sys.platform == "win32":
-    # modo sem console
+    # Modo sem console
     base = "Win32GUI"
 
 setup(
