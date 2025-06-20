@@ -1,3 +1,4 @@
+from curses import raw
 import fnmatch
 import ssl
 
@@ -15,7 +16,7 @@ from printer_zq230 import ZQ230Printer  #  Módulo de socket/ZPL
 from datetime import datetime, timedelta
 from PIL import Image, ImageDraw, ImageFont
 from flask import (
-    Flask, render_template, request, redirect,
+    Flask, json, render_template, request, redirect,
     flash, session, url_for
 )
 
@@ -28,6 +29,7 @@ font = ImageFont.truetype(windows_font, size=14)
 BASE_DIR     = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
 CONFIG_FILE  = os.path.join(BASE_DIR, 'config.txt')
 CSV_FILE     = os.path.join(BASE_DIR, 'baseFloricultura.csv')
+CSV_FILE2     = os.path.join(BASE_DIR, 'baseFariados.csv')
 PRINTERS_CSV = os.path.join(BASE_DIR, 'printers.csv')
 LOG_FILE = os.path.join(BASE_DIR, "logs.csv")
 
@@ -64,17 +66,29 @@ def load_db_Flor():
 # --- Carrega base CSV FLV em memória ---
 def load_db_FLV():
     db = {}
-    if not os.path.exists(CSV_FILE):
+    if not os.path.exists(CSV_FILE2):
         return db
-    with open(CSV_FILE, newline='', encoding='utf-8') as f:
+    with open(CSV_FILE2, newline='', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
-            ean    = row['EAN-13'].strip()
-            desc   = row['Descricao'].strip()
-            codprod= row['Cod.Prod'].strip()
-            # indexa pelos dois campos
-            db[ean]     = {'ean': ean, 'descricao': desc, 'codprod': codprod}
-            db[codprod] = {'ean': ean, 'descricao': desc, 'codprod': codprod}
+            ean     = row['EAN-13'].strip()
+            desc    = row['Descricao'].strip()
+            codprod = row['Cod.Prod'].strip()
+            validade= int(row['Validade'].strip())
+            raw     = row['Info.nutricional'].strip()
+            try:
+                info_list = json.loads(raw)
+            except json.JSONDecodeError:
+                # se não for JSON válido, joga tudo numa única linha
+                info_list = [ raw ]
+            db[ean]     = {
+                'ean': ean,
+                'descricao': desc,
+                'codprod': codprod,
+                'validade': validade,
+                'info_nutri': info_list
+            }
+            db[codprod] = db[ean]
     return db
 
 def load_printer_map():
@@ -218,8 +232,6 @@ def validou_codigo(codigo: str) -> bool:
             for v in DB.values()
         )
 
-# --- Impressão via driver Zebra usando ImageWin ---
-
 DB = load_db_Flor()
 Y_OFFSET = 50  # fixo vertical
 
@@ -244,24 +256,53 @@ def gerar_zpl_templateFlor(texto: str, codprod: str, ean: str, copies:int , ls:i
 ^XZ
  """
 
-def gerar_zpl_templateFLV(texto: str, infnutri: str, codprod: str, ean: str, validade:int, data:str, copies:int , ls:int) -> str:
-        return f"""
-^XA
-^PRD^FS
-^LS{ls}^FS
-^LH0,0^FS
-^LL100^FS
-^JMA^FS
-^BY2
-^FO90,50^A0N,50,20^FD{texto} ^FS
-^FO90,115^A0N,15,20^FD{infnutri} ^FS
-^FO130,420^A0N,25,20^FD{codprod}-3^FS
-^FO120,440^BEN,50,Y,N^FD{ean}^FS 
-^FO90,540^A0N,40,30^FDValidade: {validade} Dias^FS
-^FO90,605^A0N,40,30^FDProduzido: {data}^FS
-^PQ{copies},0,1,N
-^XZ
- """
+
+def gerar_zpl_templateFLV(texto: str,
+                          infnutri_str: str,
+                          codprod: str,
+                          ean: str,
+                          validade: int,
+                          data: str,
+                          copies: int,
+                          ls: int) -> str:
+    # Tenta parsear a string JSON; se já for lista, usa-a diretamente
+    try:
+        inf_list = json.loads(infnutri_str)
+    except (json.JSONDecodeError, TypeError):
+        inf_list = infnutri_str if isinstance(infnutri_str, list) else [infnutri_str]
+
+    lines = []
+    # Cabeçalho e carga de LS
+    lines.append("^XA")
+    lines.append("^PRD^FS")
+    lines.append(f"^LS{ls}^FS")
+    lines.append("^LH0,0^FS")
+    lines.append("^LL100^FS")
+    lines.append("^JMA^FS")
+    lines.append("^BY2")
+
+    # Texto principal
+    lines.append(f"^FO90,50^A0N,50,20^FD{texto}^FS")
+
+    # Informação nutricional: uma linha a cada +20 em Y, começando em 115
+    y0 = 115
+    for i, item in enumerate(inf_list):
+        y = y0 + 20 * i
+        # se quiser limitar largura, pode truncar item aqui
+        lines.append(f"^FO90,{y}^A0N,15,20^FD{item}^FS")
+
+    # Demais campos fixos
+    lines.append(f"^FO130,420^A0N,25,20^FD{codprod}^FS")
+    lines.append(f"^FO120,440^BEN,50,Y,N^FD{ean}^FS")
+    lines.append(f"^FO90,540^A0N,40,30^FDValidade: {validade} Dias^FS")
+    lines.append(f"^FO90,605^A0N,40,30^FDProduzido: {data}^FS")
+
+    # Quantidade de cópias e fim
+    lines.append(f"^PQ{copies},0,1,N")
+    lines.append("^XZ")
+
+    # Junta tudo com quebras de linha
+    return "\n".join(lines)
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -342,13 +383,14 @@ def index():
             else:
                 ls = loja_map['ls_flv'] if modo == "FLV" else loja_map['ls_flor']
                 zpl = gerar_zpl_templateFLV(
-                    infnutri   = rec['infnutri'],
-                    codprod = rec['codprod'],
-                    ean     = rec['ean'],
-                    validade     = rec['Validade'],
-                    data = datetime.now().isoformat(sep=" ", timespec="day"),
-                    copies  = copies,
-                    ls = loja_map['ls_flv'] if modo=="FLV" else loja_map['ls_flor'])
+                    texto    = rec['descricao'],
+                    infnutri = rec['info_nutri'],  
+                    codprod  = rec['codprod'],
+                    ean      = rec['ean'],
+                    validade = rec['validade'],
+                    data     = datetime.now().strftime('%d/%m/%Y'),
+                    copies   = copies,
+                    ls       = loja_map['ls_flv'] if modo=="FLV" else loja_map['ls_flor'])
 
             try:
                 sucesso = enviar_para_impressora_ip(zpl, printer_ip)
@@ -435,10 +477,6 @@ def printers():
         ls_flor = request.form.get('ls_flor','').strip()
         ls_flv  = request.form.get('ls_flv','').strip()
 
-        # Validação mínima
-        if not loja.isdigit() :
-            flash("❌ Loja e driver são obrigatórios", "error")
-            return redirect(url_for('printers'))
         # Validações
         if not loja.isdigit() or not funcao_list:
             flash("❌ Loja e pelo menos uma Função são obrigatórios", "error")
