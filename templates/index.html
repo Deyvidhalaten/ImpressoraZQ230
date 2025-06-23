@@ -42,11 +42,11 @@
   </div>
   <div class="form-group">
 <label for="printer_ip">Impressora:</label>
-<select name="printer_ip" id="printer_ip" required>
-  {% if printers %}
-    {% for printer in printers %}
-      <option value="{{ printer.ip }}">
-        {{ printer.nome or printer.ip }}
+<select name="printer_ip" id="printer_ip" {% if not available %}disabled{% endif %}>
+  {% if available %}
+    {% for p in available %}
+      <option value="{{ p.ip }}">
+        {{ p.nome or p.ip }} ({{ p.funcao|join(', ') }})
       </option>
     {% endfor %}
   {% else %}

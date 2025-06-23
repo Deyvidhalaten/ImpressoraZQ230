@@ -333,30 +333,36 @@ def gerar_zpl_templateFLV(
     ]
     return "\n".join(lines)
 
-
 @app.route("/", methods=["GET", "POST"])
 def index():
     mappings  = load_printer_map()
     client_ip = request.remote_addr
 
     # 1) Encontra o mapeamento da loja
-    loja_map = next(
-        (m for m in mappings if fnmatch.fnmatch(client_ip, m['pattern'])),
-        None
-    )
+    loja_map = next((m for m in mappings if fnmatch.fnmatch(client_ip, m['pattern'])), None)
     if not loja_map:
         flash("❌ Loja não cadastrada — contate o administrador.", "error")
-        return render_template("index.html", printers=[])
+        return render_template("index.html", printers=[], available=[])
 
-    # 2) Determina o modo e lista as impressoras da loja
-    modo = request.form.get("modo", "Floricultura")
-    printers = [m for m in mappings if m['loja'] == loja_map['loja']]
+    # 2) Pega o modo e lista todas as impressoras desta loja
+    modo     = request.form.get("modo", "Floricultura")
+    printers = [p for p in mappings if p['loja'] == loja_map['loja']]
 
-    # 3) Processa POST
+    # só as impressoras que suportam este modo
+    available = [p for p in printers if modo in p['funcao']]
+
     if request.method == "POST":
-        action     = request.form.get("action", "print")
-        sel_ip     = request.form.get("printer_ip")
-        printer_ip = sel_ip or loja_map.get('ip')
+        action = request.form.get("action", "print")
+
+        # escolhe o IP: ou o que veio do select, ou a primeira disponível
+        sel_ip = request.form.get("printer_ip")
+        if sel_ip and any(p['ip'] == sel_ip for p in available):
+            printer_ip = sel_ip
+        elif available:
+            printer_ip = available[0]['ip']
+        else:
+            flash(f"❌ Nenhuma impressora configurada para o modo {modo}", "error")
+            return render_template("index.html", printers=printers, available=available, modo=modo)
 
         # --- Carga de LS via ZPL ---
         if action == "load":
@@ -367,7 +373,7 @@ def index():
                 f"{'✅' if sucesso else '❌'} Carga '{modo}' (LS={ls}) {'enviada' if sucesso else 'falhou'} em {printer_ip}",
                 "success" if sucesso else "error"
             )
-            return render_template("index.html", printers=printers)
+            return render_template("index.html", printers=printers, available=available, modo=modo)
 
         # --- Impressão via ZPL ---
         if action == "print":
@@ -379,38 +385,17 @@ def index():
 
             # valida código
             codigo = request.form.get("codigo", "").strip()
-            if not validou_codigo(codigo,modo):
+            if not validou_codigo(codigo, modo):
                 flash("❌ Código inválido ou não encontrado", "error")
-                return render_template("index.html", printers=printers)
+                return render_template("index.html", printers=printers, available=available, modo=modo)
 
-            # extrai chave para lookup
             chave = codigo.split("-", 1)[0]
-            # escolhe a base certa conforme o modo
-            if modo == "FLV":
-                rec = DB_FLV.get(chave)
-            else:
-                rec = DB.get(chave)
-
+            rec = DB_FLV.get(chave) if modo == "FLV" else DB.get(chave)
             if not rec:
                 flash("❌ Produto não encontrado", "error")
-                return render_template("index.html", printers=printers)
+                return render_template("index.html", printers=printers, available=available, modo=modo)
 
-            # só acessa esses campos quando for FLV
-            if modo == "FLV":
-                infnutri = rec.get('info_nutri', [])   # sem vírgula no final!
-                validade = rec.get('validade')
-            else:
-                infnutri = []
-                validade = None
-
-            # verifica se essa loja suporta o modo
-            # (supondo que você converta funcao em lista)
-            funcao_list = loja_map['funcao']  # ex: ['Floricultura','FLV']
-            if modo not in funcao_list:
-                flash(f"❌ Impressora selecionada não suporta o modo {modo}", "error")
-                return render_template("index.html", printers=printers)
-
-            # monta o ZPL correto
+            # monta o ZPL conforme o modo
             if modo == "Floricultura":
                 zpl = gerar_zpl_templateFlor(
                     texto   = rec['descricao'],
@@ -420,6 +405,8 @@ def index():
                     ls      = loja_map['ls_flor']
                 )
             else:  # FLV
+                infnutri = rec.get('info_nutri', [])
+                validade = rec.get('validade')
                 zpl = gerar_zpl_templateFLV(
                     texto    = rec['descricao'],
                     infnutri = infnutri,
@@ -431,7 +418,6 @@ def index():
                     ls       = loja_map['ls_flv']
                 )
 
-            # envia e registra log
             sucesso = enviar_para_impressora_ip(zpl, printer_ip)
             if sucesso:
                 append_log(
@@ -444,10 +430,10 @@ def index():
             else:
                 flash(f"❌ Falha de comunicação com {printer_ip}", "error")
 
-            return render_template("index.html", printers=printers)
+            return render_template("index.html", printers=printers, available=available, modo=modo)
 
-    # 4) GET ou sem ação: exibe formulário
-    return render_template("index.html", printers=printers)
+    # GET ou sem ação: exibe formulário
+    return render_template("index.html", printers=printers, available=available, modo=modo)
 
 # --- Login / Logout / Settings ---
 @app.route("/login", methods=["GET","POST"])
