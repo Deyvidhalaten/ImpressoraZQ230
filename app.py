@@ -240,20 +240,21 @@ def shutdown():
 # --- Validadores e lookup CSV ---
 def validou_codigo(codigo: str, modo: str) -> bool:
     chave_base = codigo.split('-', 1)[0]
+    # tem que ser só dígitos e entre 4 e 13 chars
     if not chave_base.isdigit() or not (4 <= len(chave_base) <= 13):
         return False
 
+    # escolhe a base certa
+    db = DB_FLV if modo == "FLV" else DB
+
     if len(chave_base) == 13:
         # EAN-13 precisa bater exatamente
-        if modo=="FLV":
-            return chave_base in DB_FLV
-        else:
-            return chave_base in DB
+        return chave_base in db
     else:
         # qualquer Cod.Prod que comece pelo prefixo
         return any(
-            v['codprod'].startswith(chave_base)
-            for v in DB.values()
+            rec['codprod'].startswith(chave_base)
+            for rec in db.values()
         )
 
 DB           = load_db_Flor()        # para Floricultura
@@ -401,10 +402,6 @@ def index():
             else:
                 infnutri = []
                 validade = None
-
-            if not validou_codigo(codigo):
-                flash("❌ Código inválido ou não encontrado", "error")
-                return render_template("index.html", printers=printers)
 
             # verifica se essa loja suporta o modo
             # (supondo que você converta funcao em lista)
