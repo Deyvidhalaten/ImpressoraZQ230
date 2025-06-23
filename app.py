@@ -91,20 +91,28 @@ def load_db_FLV():
             except ValueError:
                 validade = None
 
-            # limpa o JSON cru: remove bullets “‣”, converte aspas simples em duplas
-            info_clean = info_raw.replace('\u2023','')\
-                                 .replace("'", '"')\
-                                 .strip()
-            # remove eventuais quebras de linha
-            info_clean = re.sub(r'[\r\n]+', ' ', info_clean)
+                 # ——————— LIMPEZA DO JSON ———————
+            # 1) Se o CSV deixou aspas externas, remove-as:
+            if info_raw.startswith('"[') and info_raw.endswith(']"'):
+                info_json = info_raw[1:-1]
+            else:
+                info_json = info_raw
+
+            # 2) remove QUALQUER vírgula imediatamente antes do ]
+            info_json = re.sub(r',\s*\]$', ']', info_json)
+
 
             # tenta carregar JSON, senão deixa tudo numa única linha
+            # 3) tenta fazer o parse de JSON
             try:
-                info_list = _json.loads(info_raw)
+                info_list = _json.loads(info_json)
                 if not isinstance(info_list, list):
                     info_list = [info_list]
-            except (_json.JSONDecodeError, TypeError):
-                info_list = [info_raw]
+            except Exception as e:
+                # DEBUG: imprima no console para ver o que está dando errado
+                print(f"[DEBUG] JSON decode falhou para EAN={ean_raw!r}:", e)
+                print("        info_json =", repr(info_json))
+                info_list = [info_json]
 
             rec = {
                 'ean': ean_raw,
