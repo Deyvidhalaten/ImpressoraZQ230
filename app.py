@@ -238,14 +238,17 @@ def shutdown():
     return redirect(url_for('settings'))
 
 # --- Validadores e lookup CSV ---
-def validou_codigo(codigo: str) -> bool:
+def validou_codigo(codigo: str, modo: str) -> bool:
     chave_base = codigo.split('-', 1)[0]
     if not chave_base.isdigit() or not (4 <= len(chave_base) <= 13):
         return False
 
     if len(chave_base) == 13:
         # EAN-13 precisa bater exatamente
-        return chave_base in DB
+        if modo=="FLV":
+            return chave_base in DB_FLV
+        else:
+            return chave_base in DB
     else:
         # qualquer Cod.Prod que comece pelo prefixo
         return any(
@@ -375,7 +378,7 @@ def index():
 
             # valida código
             codigo = request.form.get("codigo", "").strip()
-            if not validou_codigo(codigo):
+            if not validou_codigo(codigo,modo):
                 flash("❌ Código inválido ou não encontrado", "error")
                 return render_template("index.html", printers=printers)
 
@@ -398,6 +401,10 @@ def index():
             else:
                 infnutri = []
                 validade = None
+
+            if not validou_codigo(codigo):
+                flash("❌ Código inválido ou não encontrado", "error")
+                return render_template("index.html", printers=printers)
 
             # verifica se essa loja suporta o modo
             # (supondo que você converta funcao em lista)
