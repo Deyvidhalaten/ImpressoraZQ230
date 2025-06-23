@@ -4,9 +4,9 @@ pip install flask                     # web framework
 pip install requests                  # para chamadas HTTP (bwip-js)
 pip install windows-curses
 pip install waitress
-
-Caso de erro ao instalar o waitress pode ser a versão do python ou regra AD, podes voltar para o 3.11 ou rodar este: 
 pip install --no-binary :all: waitress
+Caso de erro ao instalar o :all waitress pode ser a versão do python ou regra AD, podes voltar para o 3.11 ou rodar este: 
+
 
 waitress-serve --listen=10.17.30.2:8000 app:app          #Rodar Servidor em LAN
 
