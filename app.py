@@ -1,5 +1,6 @@
 from curses import raw
 import fnmatch
+import re
 import ssl
 
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -89,6 +90,13 @@ def load_db_FLV():
                 validade = int(validade_raw)
             except ValueError:
                 validade = None
+
+            # limpa o JSON cru: remove bullets “‣”, converte aspas simples em duplas
+            info_clean = info_raw.replace('\u2023','')\
+                                 .replace("'", '"')\
+                                 .strip()
+            # remove eventuais quebras de linha
+            info_clean = re.sub(r'[\r\n]+', ' ', info_clean)
 
             # tenta carregar JSON, senão deixa tudo numa única linha
             try:
