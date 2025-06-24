@@ -1,30 +1,52 @@
-from curses import raw
+import os
+import sys
+import ssl
 import fnmatch
 import re
-import ssl
-
-ssl._create_default_https_context = ssl._create_unverified_context
-import sys
-import os
 import socket
-import urllib3
 import csv
 import json as _json
-
-from PIL import Image
-
-
-from printer_zq230 import ZQ230Printer  #  Módulo de socket/ZPL
 from datetime import datetime, timedelta
-from PIL import Image, ImageDraw, ImageFont
+
+# --- imports de terceiros ---
+import urllib3
 from flask import (
-    Flask, render_template, request, redirect,
-    flash, session, url_for
+    Flask,
+    render_template,
+    request,
+    redirect,
+    flash,
+    session,
+    url_for,
+    json as flask_json,
 )
+from PIL import Image, ImageFont
 
+# --- imports locais ---
+from printer_zq230 import ZQ230Printer  # Módulo de socket/ZPL
 
-windows_font = os.path.join(os.environ['WINDIR'], 'Fonts', 'arial.ttf')
-# e quando for instanciar:
+# --- configuração SSL (evita warnings de certificado) ---
+ssl._create_default_https_context = ssl._create_unverified_context
+
+# --- configuração do Flask e paths ---
+BASE_DIR = (
+    os.path.dirname(sys.executable)
+    if getattr(sys, "frozen", False)
+    else os.path.dirname(__file__)
+)
+app = Flask(
+    __name__,
+    template_folder=os.path.join(BASE_DIR, "templates"),
+    static_folder=os.path.join(BASE_DIR, "static"),
+)
+app.secret_key = "chave-secreta"
+app.permanent_session_lifetime = timedelta(minutes=5)
+
+# Desativa warnings de SSL do urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# Fonte padrão Windows
+windows_font = os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts", "arial.ttf")
 font = ImageFont.truetype(windows_font, size=14)
 
 # --- CONFIGURAÇÃO DE PERSISTÊNCIA ---
@@ -253,26 +275,6 @@ def shutdown():
     flash("❌ Senha inválida para encerramento", "error")
     return redirect(url_for('settings'))
 
-# --- Validadores e lookup CSV ---
-def validou_codigo(codigo: str, modo: str) -> bool:
-    chave_base = codigo.split('-', 1)[0]
-    # tem que ser só dígitos e entre 4 e 13 chars
-    if not chave_base.isdigit() or not (4 <= len(chave_base) <= 13):
-        return False
-
-    # escolhe a base certa
-    db = DB_FLV if modo == "FLV" else DB
-
-    if len(chave_base) == 13:
-        # EAN-13 precisa bater exatamente
-        return chave_base in db
-    else:
-        # qualquer Cod.Prod que comece pelo prefixo
-        return any(
-            rec['codprod'].startswith(chave_base)
-            for rec in db.values()
-        )
-
 DB           = load_db_Flor()        # para Floricultura
 DB_FLV       = load_db_FLV()    # para FLV
 Y_OFFSET = 50  # fixo vertical
@@ -349,6 +351,21 @@ def gerar_zpl_templateFLV(
     ]
     return "\n".join(lines)
 
+def normalize_codigo(codigo: str) -> str | None:
+    """
+    Recebe um valor como "130249" ou "130249-?  
+    Retorna "13024-9" ou "3000001302490", ou None se inválido.
+    """
+    # tira tudo que não é dígito
+    chave = ''.join(c for c in codigo if c.isdigit())
+    # EAN-13?
+    if len(chave) == 13:
+        return chave
+    # Cod.Prod reduzido? de 4 a 12 dígitos => "XXXX-Y"
+    if 4 <= len(chave) <= 12:
+        return f"{chave[:-1]}-{chave[-1]}"
+    return None
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     mappings  = load_printer_map()
@@ -358,98 +375,94 @@ def index():
     loja_map = next((m for m in mappings if fnmatch.fnmatch(client_ip, m['pattern'])), None)
     if not loja_map:
         flash("❌ Loja não cadastrada — contate o administrador.", "error")
-        return render_template("index.html", printers=[], available=[])
+        # Ainda precisa passar printers=[] para o template
+        return render_template("index.html",
+            printers=[],
+            available=[],
+            modo="Floricultura"
+        )
 
-    # 2) Pega o modo e lista todas as impressoras desta loja
-    modo     = request.form.get("modo", "Floricultura")
-    printers = [p for p in mappings if p['loja'] == loja_map['loja']]
-
-    # só as impressoras que suportam este modo
+    # 2) Descobre o modo e lista impressoras
+    modo      = request.form.get("modo", "Floricultura")
+    printers  = [p for p in mappings if p['loja'] == loja_map['loja']]
     available = [p for p in printers if modo in p['funcao']]
+
+    def _render():
+        return render_template("index.html",
+            printers=printers,
+            available=available,
+            modo=modo
+        )
 
     if request.method == "POST":
         action = request.form.get("action", "print")
 
-        # escolhe o IP: ou o que veio do select, ou a primeira disponível
+        
+        # escolhe o IP (selecionado ou primeiro disponível)
         sel_ip = request.form.get("printer_ip")
-        if sel_ip and any(p['ip'] == sel_ip for p in available):
+        print(">>> sel_ip:", sel_ip)
+        if sel_ip and any(p['ip']==sel_ip for p in available):
             printer_ip = sel_ip
         elif available:
             printer_ip = available[0]['ip']
         else:
-            flash(f"❌ Nenhuma impressora configurada para o modo {modo}", "error")
-            return render_template("index.html", printers=printers, available=available, modo=modo)
+            flash(f"❌ Nenhuma impressora disponível para o modo {modo}", "error")
+            return _render()
 
-        # --- Carga de LS via ZPL ---
         if action == "load":
-            ls  = loja_map['ls_flor'] if modo == "Floricultura" else loja_map['ls_flv']
-            zpl = f"^XA\n^MD30\n^LS{ls}\n^XZ"
+            ls   = loja_map['ls_flor'] if modo=="Floricultura" else loja_map['ls_flv']
+            zpl  = f"^XA\n^MD30\n^LS{ls}\n^XZ"
             sucesso = enviar_para_impressora_ip(zpl, printer_ip)
-            flash(
-                f"{'✅' if sucesso else '❌'} Carga '{modo}' (LS={ls}) {'enviada' if sucesso else 'falhou'} em {printer_ip}",
-                "success" if sucesso else "error"
+            flash(f"{'✅' if sucesso else '❌'} Carga {modo} {'enviada' if sucesso else 'falhou'} em {printer_ip}",
+                  "success" if sucesso else "error")
+            return _render()
+
+        # imprimir
+        try:
+            copies = max(1, min(int(request.form.get("copies","1")),100))
+        except ValueError:
+            copies = 1
+
+        codigo_raw = request.form.get("codigo","").strip()
+        norm       = normalize_codigo(codigo_raw)
+        db         = DB_FLV if modo=="FLV" else DB
+        rec        = db.get(norm)
+        if not rec:
+            flash("❌ Produto não encontrado", "error")
+            return _render()
+
+        if modo=="Floricultura":
+            zpl = gerar_zpl_templateFlor(
+                texto   = rec['descricao'],
+                codprod = rec['codprod'],
+                ean     = rec['ean'],
+                copies  = copies,
+                ls      = loja_map['ls_flor']
             )
-            return render_template("index.html", printers=printers, available=available, modo=modo)
+        else:
+            zpl = gerar_zpl_templateFLV(
+                texto    = rec['descricao'],
+                infnutri = rec.get('info_nutri', []),
+                codprod  = rec['codprod'],
+                ean      = rec['ean'],
+                validade = rec.get('validade'),
+                data     = datetime.now().strftime('%d/%m/%Y'),
+                copies   = copies,
+                ls       = loja_map['ls_flv']
+            )
 
-        # --- Impressão via ZPL ---
-        if action == "print":
-            # valida cópias
-            try:
-                copies = max(1, min(int(request.form.get("copies", "1")), 100))
-            except ValueError:
-                copies = 1
+        sucesso = enviar_para_impressora_ip(zpl, printer_ip)
+        if sucesso:
+            append_log("print", client_ip, printer_ip,
+                       f"ean={rec['ean']},codprod={rec['codprod']},copies={copies},modo={modo}")
+            flash(f"✅ {copies} etiqueta(s) para {printer_ip}", "success")
+        else:
+            flash(f"❌ Falha de comunicação com {printer_ip}", "error")
 
-            # valida código
-            codigo = request.form.get("codigo", "").strip()
-            if not validou_codigo(codigo, modo):
-                flash("❌ Código inválido ou não encontrado", "error")
-                return render_template("index.html", printers=printers, available=available, modo=modo)
+        return _render()
 
-            chave = codigo.split("-", 1)[0]
-            rec = DB_FLV.get(chave) if modo == "FLV" else DB.get(chave)
-            if not rec:
-                flash("❌ Produto não encontrado", "error")
-                return render_template("index.html", printers=printers, available=available, modo=modo)
-
-            # monta o ZPL conforme o modo
-            if modo == "Floricultura":
-                zpl = gerar_zpl_templateFlor(
-                    texto   = rec['descricao'],
-                    codprod = rec['codprod'],
-                    ean     = rec['ean'],
-                    copies  = copies,
-                    ls      = loja_map['ls_flor']
-                )
-            else:  # FLV
-                infnutri = rec.get('info_nutri', [])
-                validade = rec.get('validade')
-                zpl = gerar_zpl_templateFLV(
-                    texto    = rec['descricao'],
-                    infnutri = infnutri,
-                    codprod  = rec['codprod'],
-                    ean      = rec['ean'],
-                    validade = validade,
-                    data     = datetime.now().strftime('%d/%m/%Y'),
-                    copies   = copies,
-                    ls       = loja_map['ls_flv']
-                )
-
-            sucesso = enviar_para_impressora_ip(zpl, printer_ip)
-            if sucesso:
-                append_log(
-                    evento="print",
-                    ip=client_ip,
-                    impressora=printer_ip,
-                    detalhes=f"ean={rec['ean']}, codprod={rec['codprod']}, copies={copies}, modo={modo}"
-                )
-                flash(f"✅ {copies} etiqueta(s) enviada(s) para {printer_ip}", "success")
-            else:
-                flash(f"❌ Falha de comunicação com {printer_ip}", "error")
-
-            return render_template("index.html", printers=printers, available=available, modo=modo)
-
-    # GET ou sem ação: exibe formulário
-    return render_template("index.html", printers=printers, available=available, modo=modo)
+    # GET
+    return _render()
 
 # --- Login / Logout / Settings ---
 @app.route("/login", methods=["GET","POST"])

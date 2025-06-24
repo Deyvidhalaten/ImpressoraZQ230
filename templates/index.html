@@ -1,4 +1,3 @@
-<!-- templates/index.html -->
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -7,7 +6,7 @@
   <title>Impressão</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body>
+<body data-printers='{{ printers | tojson | safe }}'>
   <div class="container">
     <div class="nav">
       <a href="{{ url_for('index') }}">Impressão</a>
@@ -21,55 +20,66 @@
 
     <h1>Imprimir EAN-13</h1>
     <form method="POST" action="{{ url_for('index') }}">
-  <label for="codigo">Código EAN-13:</label>
-  <input type="text" id="codigo" name="codigo" required>
+      <label for="codigo">Código EAN-13:</label>
+      <input type="text" id="codigo" name="codigo" required>
 
-  <fieldset style="margin-top:10px;">
-    <legend>Modo de Impressão:</legend>
-    <label><input type="radio" name="modo" value="Floricultura" checked> Floricultura</label>
-    <label><input type="radio" name="modo" value="FLV"> FLV</label>
-  </fieldset>
-<div class="form-inline">
-  <div class="form-group">
-    <label for="copies">Cópias (1–100):</label>
-    <input 
-      type="number" 
-      id="copies" 
-      name="copies" 
-      value="1" 
-      min="1" max="100" required
-    >
-  </div>
-  <div class="form-group">
-<label for="printer_ip">Impressora:</label>
-<select name="printer_ip" id="printer_ip" {% if not available %}disabled{% endif %}>
-  {% if available %}
-    {% for p in available %}
-      <option value="{{ p.ip }}">
-        {{ p.nome or p.ip }} ({{ p.funcao|join(', ') }})
-      </option>
-    {% endfor %}
-  {% else %}
-    <option disabled>Nenhuma impressora disponível</option>
-  {% endif %}
-</select>
-  </div>
-</div>
+      <fieldset style="margin-top:10px;">
+        <legend>Modo de Impressão:</legend>
+        <label>
+          <input type="radio" name="modo" value="Floricultura"
+            {% if modo == "Floricultura" %}checked{% endif %}>
+          Floricultura
+        </label>
+        <label>
+          <input type="radio" name="modo" value="FLV"
+            {% if modo == "FLV" %}checked{% endif %}>
+          FLV
+        </label>
+      </fieldset>
 
-  <div style="margin-top:15px;">
-    <button type="submit" name="action" value="print">Imprimir</button>
-    <button type="submit"
-            name="action"
-            value="load"
-            formnovalidate>Enviar Carga</button>
-  </div>
-</form>
+      <div class="form-inline">
+        <div class="form-group">
+          <label for="copies">Cópias (1–100):</label>
+          <input 
+            type="number" 
+            id="copies" 
+            name="copies" 
+            min="1" max="100" required
+          />
+        </div>
+        <div class="form-group">
+          <label for="printer_ip">Impressora:</label>
+          <select name="printer_ip" id="printer_ip" required>
+            <!-- será preenchido pelo printer.js -->
+          </select>
+        </div>
+      </div>
+
+      <div style="margin-top:15px;">
+        <button type="submit" name="action" value="print">Imprimir</button>
+        <button type="submit" name="action" value="load" formnovalidate>
+          Enviar Carga
+        </button>
+      </div>
+    </form>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for cat, msg in messages %}
-        <div class="{{ 'flash-success' if cat=='success' else 'flash' }}">{{ msg }}</div>
+        <div class="{{ 'flash-success' if cat=='success' else 'flash' }}">
+          {{ msg }}
+        </div>
       {% endfor %}
     {% endwith %}
   </div>
+
+  <!-- lê o JSON do atributo data-printers e popula a variável global -->
+  <script>
+    (function(){
+      const printers = JSON.parse(document.body.dataset.printers);
+      window.PRINTERS = printers;
+    })();
+  </script>
+  <!-- carrega seu script de forma deferida -->
+  <script defer src="{{ url_for('static', filename='printer.js') }}"></script>
 </body>
 </html>
