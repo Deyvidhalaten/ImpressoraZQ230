@@ -16,13 +16,22 @@ includefiles = [
     ("templates", "templates"),
     ("static",   "static"),
     ("baseFloricultura.csv", "baseFloricultura.csv"),
+    ("baseFatiados.csv", "baseFatiados.csv"),
     ("printers.csv",           "printers.csv"),
     # Módulo ZPL
     ("printer_zq230.py",      "printer_zq230.py"),
     # Fonte Arial
-    (os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts", "arial.ttf"), "arial.ttf"),
+    (
+        os.path.join(
+            os.environ.get("WINDIR", "C:\\Windows"),
+            "Fonts",
+            "arial.ttf",
+        ),
+        "arial.ttf",
+    ),
 ]
 # Inclui DLLs do pywin32
+
 includefiles += [(dll, os.path.basename(dll)) for dll in win32_dlls]
 
 build_exe_options = {
@@ -43,13 +52,10 @@ build_exe_options = {
     ],
     "include_files": includefiles,
     "include_msvcr": True,
-    # Remove geração do arquivo de licença Python para evitar erros de permissão
-    "include_python_license": False,
 }
 
-base = None
+# Define base para Windows sem consolease = None
 if sys.platform == "win32":
-    # Modo sem console
     base = "Win32GUI"
 
 setup(
