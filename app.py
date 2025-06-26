@@ -400,7 +400,7 @@ def index():
         
         # escolhe o IP (selecionado ou primeiro disponível)
         sel_ip = request.form.get("printer_ip")
-        print(">>> sel_ip:", sel_ip)
+        
         if sel_ip and any(p['ip']==sel_ip for p in available):
             printer_ip = sel_ip
         elif available:

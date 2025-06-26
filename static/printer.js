@@ -4,7 +4,8 @@
   const modoRadios    = document.querySelectorAll('input[name="modo"]');
   const printerSelect = document.getElementById('printer_ip');
   const copiesInput   = document.getElementById('copies');
-
+  const codigo        = document.getElementById('codigo');
+  
   function populatePrinters(mode, selectedIp) {
     printerSelect.innerHTML = '';
     const avail = printers.filter(p => p.funcao.includes(mode));
@@ -59,7 +60,7 @@
     localStorage.setItem('printer_ip', e.target.value);
   });
 
-  // **Nova parte**: salvar cópias no localStorage
+  // salvar cópias no localStorage
   copiesInput.addEventListener('change', e => {
     let v = parseInt(e.target.value, 10);
     if (isNaN(v) || v < 1) v = 1;
