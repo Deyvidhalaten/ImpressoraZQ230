@@ -59,7 +59,7 @@
   <thead>
     <tr>
       <th>Loja</th>
-      <th>Padrão IP</th>
+      <th>Nome</th>
       <th>Função</th>
       <th>IP da Impressora</th>
       <th>LS Flor</th>
@@ -71,30 +71,41 @@
     {% for m in mappings %}
     <tr>
       <td>{{ m.loja }}</td>
-      <td>{{ m.pattern }}</td>
-      <td>{{ m.funcao or '—' }}</td>
+      <td>{{ m.nome}}</td>
+      <td>
+        {{ m.funcao | join(', ') }}
+      </td>
       <td>{{ m.ip or '—' }}</td>
       <td>{{ m.ls_flor }}</td>
       <td>{{ m.ls_flv }}</td>
       <td>
-        <form method="POST" style="display:inline">
-          <input type="hidden" name="action" value="delete">
-          <input type="hidden" name="pattern" value="{{ m.pattern }}">
-          <button type="submit" onclick="return confirm('Confirma exclusão?')">Excluir</button>
-        </form>
+<form method="POST" style="display:inline">
+  <input type="hidden" name="action"  value="delete">
+  <input type="hidden" name="pattern" value="{{ m.pattern }}">
+  <input type="hidden" name="ip"      value="{{ m.ip }}">
+  <button type="submit" onclick="return confirm('Confirma exclusão desta impressora?')">
+    Excluir
+  </button>
+</form>
       </td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
 
-<!-- No formulário de inclusão/edição, adicione campo de IP e LS -->
 <form method="POST">
   <label>Loja:</label>
   <input name="loja" type="number" min="1" max="99" required>
 
-  <label>Função:</label>
-  <input name="funcao" type="text">
+  <label>Nome da Impressora:</label>
+  <input name="nome" type="text" required placeholder="Ex: Zebra Frente">
+
+<label>Selecione sua(s) Funçõe(s):</label>
+<select name="funcao" multiple size="3" required>
+  <option value="Floricultura">Floricultura</option>
+  <option value="FLV">FLV</option>
+  <option value="Estoque Padaria">Estoque Padaria</option>
+</select>
 
   <label>IP da Impressora:</label>
   <input name="ip" type="text" placeholder="Ex: 10.4.30.116" required>

@@ -1,0 +1,20 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Flask com debugpy",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/app.py",
+      "console": "integratedTerminal",
+      "args": [
+        // desliga o reloader interno do Flask pra não confundir o debugger
+        "--no-reload"
+      ],
+      "env": {
+        "FLASK_ENV": "development"
+      },
+      "jinja": true
+    }
+  ]
+}

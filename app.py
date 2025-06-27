@@ -1,35 +1,59 @@
-import fnmatch
-import ssl
-
-ssl._create_default_https_context = ssl._create_unverified_context
-import sys
 import os
+import sys
+import ssl
+import fnmatch
+import re
 import socket
-import tempfile
-import urllib3
-import requests
 import csv
-
-from PIL import Image
-import win32print  # type: ignore
-
-from printer_zq230 import ZQ230Printer  #  Módulo de socket/ZPL
+import json as _json
 from datetime import datetime, timedelta
-from PIL import Image, ImageWin, ImageDraw, ImageFont
+
+# --- imports de terceiros ---
+import urllib3
 from flask import (
-    Flask, render_template, request, redirect,
-    flash, session, url_for
+    Flask,
+    render_template,
+    request,
+    redirect,
+    flash,
+    session,
+    url_for,
+    json as flask_json,
 )
+from PIL import Image, ImageFont
 
+# --- imports locais ---
+from printer_zq230 import ZQ230Printer  # Módulo de socket/ZPL
 
-windows_font = os.path.join(os.environ['WINDIR'], 'Fonts', 'arial.ttf')
-# e quando for instanciar:
+# --- configuração SSL (evita warnings de certificado) ---
+ssl._create_default_https_context = ssl._create_unverified_context
+
+# --- configuração do Flask e paths ---
+BASE_DIR = (
+    os.path.dirname(sys.executable)
+    if getattr(sys, "frozen", False)
+    else os.path.dirname(__file__)
+)
+app = Flask(
+    __name__,
+    template_folder=os.path.join(BASE_DIR, "templates"),
+    static_folder=os.path.join(BASE_DIR, "static"),
+)
+app.secret_key = "chave-secreta"
+app.permanent_session_lifetime = timedelta(minutes=5)
+
+# Desativa warnings de SSL do urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# Fonte padrão Windows
+windows_font = os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts", "arial.ttf")
 font = ImageFont.truetype(windows_font, size=14)
 
 # --- CONFIGURAÇÃO DE PERSISTÊNCIA ---
 BASE_DIR     = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
 CONFIG_FILE  = os.path.join(BASE_DIR, 'config.txt')
 CSV_FILE     = os.path.join(BASE_DIR, 'baseFloricultura.csv')
+CSV_FILE2     = os.path.join(BASE_DIR, 'baseFatiados.csv')
 PRINTERS_CSV = os.path.join(BASE_DIR, 'printers.csv')
 LOG_FILE = os.path.join(BASE_DIR, "logs.csv")
 
@@ -47,8 +71,8 @@ PORTA_IMPRESSORA = DEFAULT_PORTA
 LS_FLOR_VALUE    = DEFAULT_LS_FLOR
 LS_FLV_VALUE     = DEFAULT_LS_FLV
 
-# --- Carrega base CSV em memória ---
-def load_db():
+# --- Carrega base CSV Flor em memória ---
+def load_db_Flor():
     db = {}
     if not os.path.exists(CSV_FILE):
         return db
@@ -63,18 +87,86 @@ def load_db():
             db[codprod] = {'ean': ean, 'descricao': desc, 'codprod': codprod}
     return db
 
+# --- Carrega base CSV FLV em memória ---
+def load_db_FLV():
+    db = {}
+    if not os.path.exists(CSV_FILE2):
+        return db
+
+    with open(CSV_FILE2, newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            # pega cada coluna de forma segura
+            ean_raw       = (row.get('EAN-13') or '').strip()
+            desc          = (row.get('Descricao') or '').strip()
+            codprod       = (row.get('Cod.Prod') or '').strip()
+            validade_raw  = (row.get('Validade') or '').strip()
+            info_raw      = (row.get('Info.nutricional') or '').strip()
+
+            # se não tiver ean ou codprod válido, pula
+            if not ean_raw or not codprod:
+                continue
+
+            # tenta converter validade
+            try:
+                validade = int(validade_raw)
+            except ValueError:
+                validade = None
+
+                 # ——————— LIMPEZA DO JSON ———————
+            # 1) Se o CSV deixou aspas externas, remove-as:
+            if info_raw.startswith('"[') and info_raw.endswith(']"'):
+                info_json = info_raw[1:-1]
+            else:
+                info_json = info_raw
+
+            # 2) remove QUALQUER vírgula imediatamente antes do ]
+            info_json = re.sub(r',\s*\]$', ']', info_json)
+
+
+            # tenta carregar JSON, senão deixa tudo numa única linha
+            # 3) tenta fazer o parse de JSON
+            try:
+                info_list = _json.loads(info_json)
+                if not isinstance(info_list, list):
+                    info_list = [info_list]
+            except Exception as e:
+                # DEBUG: imprima no console para ver o que está dando errado
+                print(f"[DEBUG] JSON decode falhou para EAN={ean_raw!r}:", e)
+                print("        info_json =", repr(info_json))
+                info_list = [info_json]
+
+            rec = {
+                'ean': ean_raw,
+                'descricao': desc,
+                'codprod': codprod,
+                'validade': validade,
+                'info_nutri': info_list,
+            }
+
+            # indexa pelos dois campos
+            db[ean_raw]   = rec
+            db[codprod] = rec
+
+    return db
+
 def load_printer_map():
     maps = []
     if not os.path.exists(PRINTERS_CSV):
         return maps
+
     with open(PRINTERS_CSV, newline='', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
+            raw   = row.get('funcao', '').strip()
+            funcs = [x.strip() for x in raw.split(';') if x.strip()]
+
             maps.append({
                 'loja':    row['loja'],
                 'pattern': row['pattern'],
-                'funcao':  row.get('funcao',''),
+                'nome':    row.get('nome','').strip(),
                 'ip':      row.get('ip',''),
+                'funcao':  funcs,
                 'ls_flor': int(row.get('ls_flor', 0)),
                 'ls_flv':  int(row.get('ls_flv', 0)),
             })
@@ -183,294 +275,16 @@ def shutdown():
     flash("❌ Senha inválida para encerramento", "error")
     return redirect(url_for('settings'))
 
-# --- Validadores e lookup CSV ---
-def validou_codigo(codigo: str) -> bool:
-    chave_base = codigo.split('-', 1)[0]
-    if not chave_base.isdigit() or not (4 <= len(chave_base) <= 13):
-        return False
-
-    if len(chave_base) == 13:
-        # EAN-13 precisa bater exatamente
-        return chave_base in DB
-    else:
-        # qualquer Cod.Prod que comece pelo prefixo
-        return any(
-            v['codprod'].startswith(chave_base)
-            for v in DB.values()
-        )
-
-
-def lookup_csv(codigo: str):
-    # retorna (descricao, codprod, ean13)
-    chave = codigo.split('-', 1)[0]
-    print(chave)
-    with open(CSV_FILE, newline='', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            # busca exata por EAN-13
-            if len(chave) == 13 and row.get('EAN-13') == chave:
-                return row.get('Descricao',''), row.get('Cod.Prod',''), row.get('EAN-13','')
-            # busca por código reduzido
-            print("Chave 1: "+chave+" Chave 2: "+row.get)
-            if len(chave) < 13 and row.get('Cod.Prod') == chave:
-                return row.get('Descricao',''), row.get('Cod.Prod',''), row.get('EAN-13','')
-    return '', '', ''
-
-def gerar_barcode_bwip(ean: str) -> str:
-    url = (
-        "https://bwipjs-api.metafloor.com/"
-        f"?bcid=ean13&text={ean}"
-        "&scale=2&height=15&includetext=true&backgroundcolor=FFFFFF"
-    )
-    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-    tmp.close()
-    resp = requests.get(url, verify=False)
-    resp.raise_for_status()
-    with open(tmp.name, "wb") as f:
-        f.write(resp.content)
-    return tmp.name
-
-
-# --- Montagem de etiqueta com texto ---
-def compose_label(ean: str, descricao: str, codprod: str) -> str:
-    # gera o PNG do barcode
-    barcode_png = gerar_barcode_bwip(ean)
-
-    # abre o PNG e cria uma nova imagem um pouco maior para o texto em cima
-    barcode = Image.open(barcode_png)
-    w, h = barcode.size
-    top_margin = 40  # altura reservada para nome+subcódigo
-    label = Image.new("RGB", (w, h + top_margin), "white")
-    label.paste(barcode, (0, top_margin))
-
-    draw = ImageDraw.Draw(label)
-    font = ImageFont.truetype("arial.ttf", size=14)  # ou outro .ttf disponível
-
-    # mede o tamanho do texto da descrição
-    box = draw.textbbox((0, 0), descricao, font=font)  
-    text_w = box[2] - box[0]
-    text_h = box[3] - box[1]
-    # centraliza horizontalmente
-    x_desc = (w - text_w) // 2
-    y_desc = 5
-    draw.text((x_desc, y_desc), descricao, font=font, fill="black")
-
-    # faz o mesmo para o código de produto, logo abaixo da descrição
-    box2 = draw.textbbox((0, 0), codprod, font=font)
-    cp_w = box2[2] - box2[0]
-    x_cp = (w - cp_w) // 2
-    y_cp = y_desc + text_h + 2
-    draw.text((x_cp, y_cp), codprod, font=font, fill="black")
-
-    # salva e retorna caminho
-    out = barcode_png.replace(".png", "_label.png")
-    label.save(out)
-    return out
-
-def resolve_printer_name(requested_name: str) -> str:
-    """
-    Varre as impressoras locais/conectadas e retorna o nome
-    completo da primeira que contenha requested_name (case-insensitive).
-    """
-    flags = win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
-    for _, _, name, _ in win32print.EnumPrinters(flags):
-        if requested_name.lower() in name.lower():
-            return name
-    raise RuntimeError(f"Impressora não encontrada: '{requested_name}'")
-
-# --- Impressão via driver Zebra usando ImageWin ---
-""""""
-Y_OFFSET = -50
-PRINTER_NAME = "ZDesigner ZD230-203dpi ZPL"
-
-"""
-def print_image_via_driver(image_path: str, x_offset: int, printer_name: str, copies: int = 1):
-
-    #Imprime um PNG via driver Zebra, ajustando o PaperLength
-    #para empilhar 'copies' etiquetas num único job GDI.
-
-    # 1) Reaplica LS antes do job (se necessário)
-    disable_reset_and_set_ls(ls_value=abs(x_offset), printer_name=printer_name)
-
-    # 2) Abre a impressora, lê e ajusta o DEVMODE
-    hPrinter = win32print.OpenPrinter(printer_name)
-    try:
-        prn_info = win32print.GetPrinter(hPrinter, 2)  
-        devmode   = prn_info['pDevMode']         
-
-        # define o número de cópias e marca o campo
-        devmode.Copies = copies
-        devmode.Fields |= win32con.DM_COPIES
-
-        # grava de volta no spooler
-        prn_info['pDevMode'] = devmode
-        win32print.SetPrinter(hPrinter, 2, prn_info, 0)
-    finally:
-        win32print.ClosePrinter(hPrinter)
-
-    # 3) Cria o DC GDI COM o DEVMODE modificado
-    #    assinatura global: CreateDC(driverName, deviceName, output, pDevMode)
-    hDC = win32ui.CreateDC("WINSPOOL", printer_name, None, devmode)
-
-    # 4) Aplica deslocamento e inicia o documento
-    hDC.SetViewportOrg((x_offset, Y_OFFSET))
-    hDC.StartDoc("Etiqueta")
-    hDC.StartPage()
-
-    # 5) Desenha a imagem
-    img = Image.open(image_path)
-    dib = ImageWin.Dib(img)
-    dib.draw(hDC.GetHandleOutput(), (0, 0, img.size[0], img.size[1]))
-
-    # 6) Finaliza o job
-    hDC.EndPage()
-    hDC.EndDoc()
-"""
-# --- Envio legado ZPL ---
-def enviar_para_impressora(zpl: str) -> bool:
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((IP_IMPRESSORA, PORTA_IMPRESSORA))
-            s.sendall(zpl.encode('latin1'))
-        return True
-    except Exception as e:
-        print("Erro ao enviar ZPL:", e)
-        return False
-
-def stack_labels(label_path: str, copies: int) -> str:
-    """
-    Lê a imagem única de etiqueta em label_path e
-    cria uma nova imagem com 'copies' etiquetas empilhadas verticalmente.
-    Retorna o caminho da imagem empilhada.
-    """
-    img   = Image.open(label_path)
-    w, h  = img.size
-    canvas = Image.new("RGB", (w, h * copies), "white")
-    for i in range(copies):
-        canvas.paste(img, (0, i * h))
-    out_path = label_path.replace(".png", f"_stack_{copies}.png")
-    canvas.save(out_path)
-    return out_path
-
-def print_raw_zpl(zpl_bytes: bytes, printer_name: str = None):
-    """
-    Envia bytes RAW (PJL+ZPL) diretamente para a fila, sem passar
-    pelo GDI, portanto o driver não injeta nenhum reset.
-    """
-    if printer_name is None:
-        printer_name = win32print.GetDefaultPrinter()
-    h = win32print.OpenPrinter(printer_name,
-    {"DesiredAccess": win32print.PRINTER_ACCESS_USE})
-    try:
-        win32print.StartDocPrinter(h, 1, ("RAW_ZPL", None, "RAW"))
-        win32print.StartPagePrinter(h)
-        win32print.WritePrinter(h, zpl_bytes)
-        win32print.EndPagePrinter(h)
-        win32print.EndDocPrinter(h)
-    finally:
-        win32print.ClosePrinter(h)
-
-def load_ls(modo: str):
-    """
-    Reenvia a carga de LS (margem esquerda) exata que o botão 'Enviar Carga' usa,
-    garantindo que a impressora volte ao LS configurado antes de cada impressão.
-    """
-    ls = LS_FLOR_VALUE if modo == 'Floricultura' else LS_FLV_VALUE
-    zpl = f"^XA\n^MD30\n^LS{ls}\n^XZ"
-    ok = enviar_para_impressora(zpl)
-    if not ok:
-        flash(f"❌ Falha ao recarregar LS antes da impressão (LS={ls})", "error")
-    else:
-        flash(f"🔄 LS recarregado (LS={ls}) antes da impressão", "info")
-
-def get_driver_for_ip(client_ip: str, mappings: list[dict]) -> str:
-    """
-    percorre mappings (vindo de load_printer_map())
-    e retorna o primeiro 'driver' cujo 'pattern' case com client_ip.
-    Ex: pattern="10.17*" casa com client_ip="10.17.30.5".
-    """
-    for m in mappings:
-        prefix = m['pattern'].rstrip('*')
-        if client_ip.startswith(prefix):
-            return m['driver']
-    # fallback para a impressora padrão
-    return win32print.GetDefaultPrinter()
-
-def disable_reset_and_set_ls(ls_value: int, printer_name: str = None):
-    """
-    1) Envia um bloco PJL que desliga o reset automático do driver (SET RESET=OFF)
-    2) Em seguida envia um bloco ZPL para aplicar ^MD30 e o ^LS desejado
-    Tudo em um único job RAW, de forma que o driver preserve o LS.
-    """
-    # PJL para desabilitar reset automático
-    pjl = b'\x1b%-12345X@PJL SET RESET=OFF\r\n\x1b%-12345X\r\n'
-    # ZPL para atualizar a margem esquerda (LS) permanentemente
-    zpl = f"^XA^MD30^LS{ls_value}^XZ\r\n".encode("ascii")
-    # Junta PJL + ZPL e envia
-    print_raw_zpl(pjl + zpl, printer_name)
-
-# --- Compor imagem final com texto acima ---
-def compose_label(barcode_path: str, descricao: str, codprod: str) -> str:
-    # Carrega o código de barras
-    img = Image.open(barcode_path)
-    largura, altura = img.size
-
-    # Espaço extra no topo para texto
-    padding_top = 40
-    nova = Image.new("RGB", (largura, altura + padding_top), "white")
-    draw = ImageDraw.Draw(nova)
-    font = ImageFont.truetype("arial.ttf", 14)
-
-    # 1) Desenha a descrição no topo
-    bbox = draw.textbbox((0, 0), descricao, font=font)
-    text_w = bbox[2] - bbox[0]
-    text_h = bbox[3] - bbox[1]
-    x = (largura - text_w) // 2
-    y = 5
-    draw.text((x, y), descricao, fill="black", font=font)
-
-    # 2) Desenha o código do produto logo abaixo
-    cod_text = f"Código: {codprod}"
-    bbox2 = draw.textbbox((0, 0), cod_text, font=font)
-    c_w = bbox2[2] - bbox2[0]
-    c_h = bbox2[3] - bbox2[1]
-    x2 = (largura - c_w) // 2
-    y2 = y + text_h + 5
-    draw.text((x2, y2), cod_text, fill="black", font=font)
-
-    # 3) Cola o código de barras abaixo do texto
-    nova.paste(img, (0, padding_top))
-
-    # Salva e retorna o caminho da imagem composta
-    out_path = barcode_path.replace(".png", "_label.png")
-    nova.save(out_path)
-    return out_path
-
-def compose_double_label(label_path: str, gap: int = 140) -> str:
-    img = Image.open(label_path)
-    w, h = img.size
-
-    # canvas com largura = 2×w + gap
-    canvas = Image.new("RGB", (2*w + gap, h), "white")
-    # primeira etiqueta colada à esquerda
-    canvas.paste(img, (0, 0))
-    # segunda etiqueta colada após w + gap pixels
-    canvas.paste(img, (w + gap, 0))
-
-    out_path = label_path.replace("_label.png", f"_double_{gap}px_gap.png")
-    canvas.save(out_path)
-    return out_path
-
-DB = load_db()
+DB           = load_db_Flor()        # para Floricultura
+DB_FLV       = load_db_FLV()    # para FLV
 Y_OFFSET = 50  # fixo vertical
 
-
-def gerar_zpl_template(texto: str, codprod: str, ean: str, copies:int , ls:int) -> str:
+def gerar_zpl_templateFlor(texto: str, codprod: str, ean: str, copies:int , ls:int) -> str:
     
     return f"""
 ^XA 
 ^PRD^FS 
-^LS60^FS
+^LS{ls}^FS
 ^PW663^FS
 ^LT0
 ^LL250^FS 
@@ -487,126 +301,168 @@ def gerar_zpl_template(texto: str, codprod: str, ean: str, copies:int , ls:int) 
  """
 
 
-# --- Rota principal ---
-@app.route("/", methods=["GET","POST"])
+def gerar_zpl_templateFLV(
+    texto: str,
+    infnutri: list[str],
+    codprod: str,
+    ean: str,
+    validade: int,
+    data: str,
+    copies: int,
+    ls: int
+) -> str:
+    # Queremos sempre até 16 linhas, mas não dar erro se tiver menos
+    MAX_LINHAS = 16
+    padded = infnutri + [""] * max(0, MAX_LINHAS - len(infnutri))
+
+    lines = [
+         "^XA",
+        "^PRD^FS",
+        f"^LS{ls}^FS",
+        "^LH0,0^FS",
+        "^LL400^FS",      # pra comportar todas as linhas
+        "^JMA^FS",
+        "^BY2",
+        f"^FO90,50^A0N,50,20^FD{texto}^FS",
+        # Na sequência, as 16 linhas de nutrição:
+        f"^FO90,115^A0N,15,20^FD{padded[0]}^FS",
+        f"^FO90,135^A0N,15,20^FD{padded[1]}^FS",
+        f"^FO90,155^A0N,15,20^FD{padded[2]}^FS",
+        f"^FO90,175^A0N,15,20^FD{padded[3]}^FS",
+        f"^FO90,195^A0N,15,20^FD{padded[4]}^FS",
+        f"^FO90,215^A0N,15,20^FD{padded[5]}^FS",
+        f"^FO90,235^A0N,15,20^FD{padded[6]}^FS",
+        f"^FO90,255^A0N,15,20^FD{padded[7]}^FS",
+        f"^FO90,275^A0N,15,20^FD{padded[8]}^FS",
+        f"^FO90,295^A0N,15,20^FD{padded[9]}^FS",
+        f"^FO90,315^A0N,15,20^FD{padded[10]}^FS",
+        f"^FO90,335^A0N,15,20^FD{padded[11]}^FS",
+        f"^FO90,355^A0N,15,20^FD{padded[12]}^FS",
+        f"^FO90,375^A0N,15,20^FD{padded[13]}^FS",
+        f"^FO90,395^A0N,15,20^FD{padded[14]}^FS",
+        f"^FO90,415^A0N,15,20^FD{padded[15]}^FS",
+        # rodapé
+        f"^FO130,440^A0N,25,20^FD{codprod}^FS",
+        f"^FO120,460^BEN,50,Y,N^FD{ean}^FS",
+        f"^FO90,550^A0N,40,30^FDValidade: {validade} Dias^FS",
+        f"^FO90,590^A0N,40,30^FDProduzido: {data}^FS",
+        f"^PQ{copies},0,1,N",
+        "^XZ",
+    ]
+    return "\n".join(lines)
+
+def normalize_codigo(codigo: str) -> str | None:
+    """
+    Recebe um valor como "130249" ou "130249-?  
+    Retorna "13024-9" ou "3000001302490", ou None se inválido.
+    """
+    # tira tudo que não é dígito
+    chave = ''.join(c for c in codigo if c.isdigit())
+    # EAN-13?
+    if len(chave) == 13:
+        return chave
+    # Cod.Prod reduzido? de 4 a 12 dígitos => "XXXX-Y"
+    if 4 <= len(chave) <= 12:
+        return f"{chave[:-1]}-{chave[-1]}"
+    return None
+
+@app.route("/", methods=["GET", "POST"])
 def index():
-    if request.method == "POST":
-        codigo = request.form.get("codigo","").strip()
-        modo   = request.form.get("modo","Floricultura")
-        action = request.form.get("action","print")
+    mappings  = load_printer_map()
+    client_ip = request.remote_addr
 
-        # --- Identifica qual mapeamento (loja) corresponde ao IP solicitante ---
-        mappings  = load_printer_map()
-        client_ip = request.remote_addr
-         # --- Identifica qual mapeamento (loja) corresponde ao IP solicitante ---
-        loja_map = next(
-            (m for m in mappings if fnmatch.fnmatch(client_ip, m['pattern'])),
-            None
+    # 1) Encontra o mapeamento da loja
+    loja_map = next((m for m in mappings if fnmatch.fnmatch(client_ip, m['pattern'])), None)
+    if not loja_map:
+        flash("❌ Loja não cadastrada — contate o administrador.", "error")
+        # Ainda precisa passar printers=[] para o template
+        return render_template("index.html",
+            printers=[],
+            available=[],
+            modo="Floricultura"
         )
-        
 
-        # --- Se não estiver cadastrado, avisa e não faz nada além disso ---
-        if loja_map is None:
-            flash("❌ Loja não cadastrada — contate o administrador.", "error")
-            return render_template("index.html")
+    # 2) Descobre o modo e lista impressoras
+    modo      = request.form.get("modo", "Floricultura")
+    printers  = [p for p in mappings if p['loja'] == loja_map['loja']]
+    available = [p for p in printers if modo in p['funcao']]
 
-        # extrai driver e margens configuradas para esta loja
-        driver_for_request = loja_map.get("loja")
-        ls_flor = loja_map.get("ls_flor", DEFAULT_LS_FLOR)
-        ls_flv  = loja_map.get("ls_flv",  DEFAULT_LS_FLV)
+    def _render():
+        return render_template("index.html",
+            printers=printers,
+            available=available,
+            modo=modo
+        )
+
+    if request.method == "POST":
+        action = request.form.get("action", "print")
+
         
-        # --- Carregar carga via ZPL ---
+        # escolhe o IP (selecionado ou primeiro disponível)
+        sel_ip = request.form.get("printer_ip")
+        
+        if sel_ip and any(p['ip']==sel_ip for p in available):
+            printer_ip = sel_ip
+        elif available:
+            printer_ip = available[0]['ip']
+        else:
+            flash(f"❌ Nenhuma impressora disponível para o modo {modo}", "error")
+            return _render()
+
         if action == "load":
-            ls = ls_flor if modo=="Floricultura" else ls_flv
+            ls   = loja_map['ls_flor'] if modo=="Floricultura" else loja_map['ls_flv']
+            zpl  = f"^XA\n^MD30\n^LS{ls}\n^XZ"
+            sucesso = enviar_para_impressora_ip(zpl, printer_ip)
+            flash(f"{'✅' if sucesso else '❌'} Carga {modo} {'enviada' if sucesso else 'falhou'} em {printer_ip}",
+                  "success" if sucesso else "error")
+            return _render()
 
-            flash(f"✅ Carga '{modo}' (LS={ls}) enviada!", "success")
-            return render_template("index.html")
+        # imprimir
+        try:
+            copies = max(1, min(int(request.form.get("copies","1")),100))
+        except ValueError:
+            copies = 1
 
-        # --- Imprimir via driver Windows/GDI ---
-        if action == "print":
-            # se o driver não existir, avisa e sai
-            if not driver_for_request:
-                flash("❌ Nenhum driver configurado para sua loja.", "error")
-                return render_template("index.html")
+        codigo_raw = request.form.get("codigo","").strip()
+        norm       = normalize_codigo(codigo_raw)
+        db         = DB_FLV if modo=="FLV" else DB
+        rec        = db.get(norm)
+        if not rec:
+            flash("❌ Produto não encontrado", "error")
+            return _render()
 
-            # lê e valida número de cópias
-            try:
-                copies = int(request.form.get("copies","1"))
-            except ValueError:
-                copies = 1
-            copies = max(1, min(copies, 100))
+        if modo=="Floricultura":
+            zpl = gerar_zpl_templateFlor(
+                texto   = rec['descricao'],
+                codprod = rec['codprod'],
+                ean     = rec['ean'],
+                copies  = copies,
+                ls      = loja_map['ls_flor']
+            )
+        else:
+            zpl = gerar_zpl_templateFLV(
+                texto    = rec['descricao'],
+                infnutri = rec.get('info_nutri', []),
+                codprod  = rec['codprod'],
+                ean      = rec['ean'],
+                validade = rec.get('validade'),
+                data     = datetime.now().strftime('%d/%m/%Y'),
+                copies   = copies,
+                ls       = loja_map['ls_flv']
+            )
 
-            if modo == "FLV":
-                flash("❌ Impressão desabilitada em modo FLV", "error")
-                return render_template("index.html")
+        sucesso = enviar_para_impressora_ip(zpl, printer_ip)
+        if sucesso:
+            append_log("print", client_ip, printer_ip,
+                       f"ean={rec['ean']},codprod={rec['codprod']},copies={copies},modo={modo}")
+            flash(f"✅ {copies} etiqueta(s) para {printer_ip}", "success")
+        else:
+            flash(f"❌ Falha de comunicação com {printer_ip}", "error")
 
-            if not validou_codigo(codigo):
-                flash("❌ Produto não encontrado", "error")
-                return render_template("index.html")
+        return _render()
 
-            # busca no DB
-            chave = codigo.split("-",1)[0]
-            if len(chave) == 13:
-                rec = DB.get(chave)
-            else:
-                rec = next((v for v in DB.values() if v['codprod'].startswith(chave)), None)
-
-            if not rec:
-                flash("❌ Produto não encontrado", "error")
-                return render_template("index.html")
-
-            # escolhe margem e offset
-            ls   = ls_flor if modo=="Floricultura" else ls_flv
-            xoff = ls
-
-            
-
-            #Gerar dados para o ZPL
-            descricao = rec['descricao']    # Pesquisa Descrição
-            codprod = rec['codprod']        # Codigo Reduzido
-            ean = rec['ean']                # Codigo EAN
-            copies = max(1, min(int(request.form.get("copies","1")), 10000))  #Copias
-            
-            printer_ip = loja_map.get("ip", DEFAULT_IP)
-            printer_port = DEFAULT_PORTA
-            zpl = gerar_zpl_template(descricao,codprod,ean,copies,ls)
-
-            try:
-                
-                printer = ZQ230Printer(host=printer_ip, port=printer_port)
-                printer.print_label(zpl)
-
-                # 2) registra apenas 1 log
-                append_log(
-                   evento="print",
-                   ip=client_ip,
-                   impressora=driver_for_request,
-                   detalhes=(
-                       f"ean={rec['ean']}, codprod={rec['codprod']}, "
-                       f"copies={copies}, modo={modo}, LS={ls}"
-                   ) 
-                )
-
-                flash(f"✅ {copies} cópia(s) impressa(s) via '{driver_for_request}'", "success")
-            except Exception as e:
-                ##Logs
-                append_log(
-                    evento="print_error",
-                    ip=client_ip,
-                    impressora=driver_for_request,
-                    detalhes=f"erro={e}"
-                )
-                flash(f"❌ Erro ao imprimir: {e}", "error")
-            return render_template("index.html")
-
-    # rota GET: apenas exibe o formulário, sem checar nada
-    return render_template("index.html")
-
-def send_ls_config(modo: str):
-    """Envia o ^LS configurado na impressora para preservar a margem."""
-    ls = LS_FLOR_VALUE if modo == 'Floricultura' else LS_FLV_VALUE
-    disable_reset_and_set_ls(ls, printer_name=PRINTER_NAME)
-    flash(f"🔄 Margem (LS={ls}) reenviada antes da impressão", "info")
+    # GET
+    return _render()
 
 # --- Login / Logout / Settings ---
 @app.route("/login", methods=["GET","POST"])
@@ -630,38 +486,47 @@ def printers():
 
     if request.method == "POST":
         action_type = request.form.get("action", "save")  # “save” por padrão ou “delete”
-
-        # —— Excluir mapeamento ——
+        
         if action_type == "delete":
             pattern_to_delete = request.form.get("pattern")
-            # busca o mapeamento antes de remover, para log
-            m_antigo = next((m for m in mappings if m["pattern"] == pattern_to_delete), None)
+            ip_to_delete      = request.form.get("ip")
+            # busca o mapeamento exato antes de remover, para log
+            m_antigo = next(
+              (m for m in mappings
+              if m["pattern"] == pattern_to_delete
+              and m["ip"]      == ip_to_delete),
+              None
+            )
             if m_antigo:
-                mappings = [m for m in mappings if m["pattern"] != pattern_to_delete]
+                # remove somente essa entrada (mesmo padrão + mesmo IP)
+                mappings = [
+                     m for m in mappings
+                     if not (m["pattern"] == pattern_to_delete and m["ip"] == ip_to_delete) 
+                ]
                 save_printer_map(mappings)
                 append_log(
                     evento="mapping_delete",
                     ip=request.remote_addr,
-                    impressora=m_antigo.get("driver",""),
-                    detalhes=f"loja={m_antigo['loja']}, pattern={pattern_to_delete}"
+                    impressora=m_antigo.get("nome", m_antigo.get("ip","")),
+                    detalhes=f"loja={m_antigo['loja']}, ip={ip_to_delete}"
                 )
-                flash(f"🗑️ Mapeamento '{pattern_to_delete}' excluído com sucesso!", "success")
+                flash(f"🗑️ Impressora {ip_to_delete} excluída com sucesso!", "success")
             else:
-                flash("❌ Mapeamento não encontrado para exclusão.", "error")
+                flash("❌ Impressora não encontrada para exclusão.", "error")
             return redirect(url_for("printers"))
 
         # —— Adicionar ou editar mapeamento ——
         loja   = request.form.get('loja','').strip()
-        funcao = request.form.get('funcao','').strip()
+        funcao_list = request.form.getlist("funcao")
+        nome = request.form.get('nome','').strip()
         ip = request.form.get('ip','').strip()
         ls_flor = request.form.get('ls_flor','').strip()
         ls_flv  = request.form.get('ls_flv','').strip()
 
-        # Validação mínima
-        if not loja.isdigit() :
-            flash("❌ Loja e driver são obrigatórios", "error")
+        # Validações
+        if not loja.isdigit() or not funcao_list:
+            flash("❌ Loja e pelo menos uma Função são obrigatórios", "error")
             return redirect(url_for('printers'))
-
         try:
             ls_flor_val = int(ls_flor)
             ls_flv_val  = int(ls_flv)
@@ -674,10 +539,11 @@ def printers():
         updated = False
 
         for m in mappings:
-            if m['pattern'] == pattern:
+            if m['loja'] == loja and m['ip'] == ip_str:
                 # antes de alterar, guardo estado antigo
                 m_antigo = m.copy()
-                m['funcao']  = funcao
+                m['nome'] = nome
+                m['funcao']  = funcao_list
                 m['ip'] = ip_str
                 m['ls_flor'] = ls_flor_val
                 m['ls_flv']  = ls_flv_val
@@ -697,12 +563,14 @@ def printers():
         if not updated:
             novo = {
                 'loja':    loja,
+                'pattern': pattern,
+                'nome':    nome,
                 'ip':      ip_str,
-                'funcao':  funcao,
+                'funcao':  funcao_list,
                 'ls_flor': ls_flor_val,
                 'ls_flv':  ls_flv_val
             }
-        mappings.append(novo)
+            mappings.append(novo)
         append_log(
            evento="mapping_add",
            ip=request.remote_addr,
@@ -718,16 +586,19 @@ def printers():
     # GET: renderiza a página normalmente
     return render_template("printers.html", mappings=mappings)
 
+
 def save_printer_map(mappings):
-    fieldnames = ['loja','pattern','driver','funcao','ip','ls_flor','ls_flv']
+    fieldnames = ['loja','pattern','nome','funcao','ip','ls_flor','ls_flv']
     with open(PRINTERS_CSV, 'w', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         for m in mappings:
+            funcs = m.get('funcao') or []
             writer.writerow({
-                'loja':    m['loja'],
-                'pattern': m['pattern'],
-                'funcao':  m.get('funcao',''),
+                'loja':    m.get('loja',''),
+                'pattern': m.get('pattern',''),
+                'nome':    m.get('nome',''),
+                'funcao':  ';'.join(funcs),
                 'ip':      m.get('ip',''),
                 'ls_flor': m.get('ls_flor',0),
                 'ls_flv':  m.get('ls_flv',0),
@@ -804,7 +675,7 @@ if __name__ == "__main__":
     append_log(evento="startup")
     try:
     # host='0.0.0.0' faz o Flask aceitar conexões de qualquer IP da sua LAN
-      app.run(host="10.17.30.2", port=8000, debug=False, use_reloader=False)
+      app.run(host="0.0.0.0", port=8000, debug=False, use_reloader=False)
     finally:
         append_log(evento="shutdown")
     

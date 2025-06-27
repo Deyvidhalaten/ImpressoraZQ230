@@ -75,3 +75,45 @@ body {
     background: #ddffdd;
     border-left-color: #4CAF50;
   }
+
+.shutdown-form {
+  display: block;
+  width: fit-content;
+  margin: 10px auto;
+  text-align: center;
+}
+
+.shutdown-form input[type="password"],
+.shutdown-form button {
+  display: inline-block;
+  width: auto;
+  margin: 0 4px 0 0;
+  font-size: 0.9em;
+}
+
+.shutdown-form button {
+  margin: 0;
+}
+
+.form-inline {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end; 
+  margin-top: 10px;
+}
+
+.form-inline .form-group {
+  flex: 1; 
+  min-width: 0; 
+}
+
+.form-inline label {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.form-inline input,
+.form-inline select {
+  width: 100%;
+  box-sizing: border-box;
+}
