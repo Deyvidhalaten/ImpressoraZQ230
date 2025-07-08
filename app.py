@@ -206,13 +206,22 @@ def get_mapping_for_ip(client_ip, mappings):
             return m
     return None
 
-def enviar_para_impressora_ip(zpl: str, ip: str, porta: int = PORTA_IMPRESSORA) -> bool:
-    """Envia diretamente via socket ZPL ao IP/porta informados."""
+def enviar_para_impressora_ip(
+    zpl: str,
+    ip: str,
+    porta: int = PORTA_IMPRESSORA,
+    timeout: float = 1.0
+) -> bool:
+    """Envia ZPL ao IP/porta informados, com timeout configurável."""
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((ip, porta))
+            s.settimeout(timeout)            # <— define o timeout
+            s.connect((ip, porta))           # <- define o IP e porta
             s.sendall(zpl.encode('latin1'))
         return True
+    except socket.timeout:
+        print(f"Timeout após {timeout}s ao conectar em {ip}:{porta}")
+        return False
     except Exception as e:
         print("Erro ao enviar ZPL por IP:", e)
         return False

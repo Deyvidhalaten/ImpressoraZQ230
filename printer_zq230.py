@@ -5,7 +5,7 @@ class ZQ230Printer:
     """
     Classe para conexão e impressão na Zebra ZQ230 via socket TCP.
     """
-    def __init__(self, host: str, port: int = 9100, timeout: float = 5.0):
+    def __init__(self, host: str, port: int = 9100, timeout: float = 1.0):
         self.host    = host
         self.port    = port
         self.timeout = timeout
