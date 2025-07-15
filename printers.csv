@@ -1,7 +1,7 @@
 loja,pattern,nome,funcao,ip,ls_flor,ls_flv
 2,10.2.*,Mataburro,Floricultura;FLV,10.2.30.109,50,-100
 3,10.3.*,Mataburro,Floricultura;FLV,10.3.30.110,0,-50
-4,10.4.*,Retaguarda-Mataburro,Floricultura;FLV,10.4.30.116,50,-60
+4,10.4.*,Retaguarda-Mataburro,Floricultura;FLV,10.4.30.116,50,-100
 5,10.5.*,Mataburro,Floricultura;FLV,10.5.30.111,60,-60
 7,10.7.*,Mataburro,Floricultura;FLV,10.7.30.140,0,0
 8,10.8.*,Mataburro,Floricultura;FLV,10.8.30.104,0,0
@@ -16,7 +16,7 @@ loja,pattern,nome,funcao,ip,ls_flor,ls_flv
 15,10.15.*,Mataburro,Floricultura;FLV,10.15.30.228,0,0
 15,10.15.*,Mataburro,Floricultura;FLV,10.15.30.204,0,0
 16,10.16.*,Mataburro,Floricultura;FLV,10.16.30.67,0,0
-17,10.17.*,Mataburro,Floricultura;FLV,10.17.30.118,50,-80
+17,10.17.*,Mataburro,Floricultura;FLV,10.17.30.118,50,-120
 17,10.17.*,Frente de Caixa,Floricultura;FLV;Estoque Padaria,10.17.30.119,50,-80
 18,10.18.*,Mataburro,Floricultura;FLV,10.18.30.127,0,0
 19,10.19.*,Mataburro,Floricultura;FLV,,0,0
