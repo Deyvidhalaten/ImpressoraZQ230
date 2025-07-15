@@ -71,17 +71,11 @@
   document.addEventListener("DOMContentLoaded", () => {
   const form = document.querySelector("form");
   if (form) {
-    form.addEventListener("submit", () => {
-      const codigo = document.getElementById("codigo");
-      if (codigo) codigo.value = "";
-    });
-  }
-
-  // Se a página for exibida após um redirect (PRG), limpa o campo código
   window.addEventListener("pageshow", function () {
-    const codigo = document.getElementById("codigo");
-    if (codigo) codigo.value = "";
-  });
+  const codigo = document.getElementById("codigo");
+  if (codigo) codigo.value = "";
+});
+  }
 });
 
 })();
