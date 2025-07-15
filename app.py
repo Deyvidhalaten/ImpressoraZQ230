@@ -468,10 +468,9 @@ def index():
         else:
             flash(f"❌ Falha de comunicação com {printer_ip}", "error")
 
-        return _render()
-
+        return redirect(url_for("index"))
     # GET
-    return redirect(url_for("index"))
+    return _render()
 
 # --- Login / Logout / Settings ---
 @app.route("/login", methods=["GET","POST"])
