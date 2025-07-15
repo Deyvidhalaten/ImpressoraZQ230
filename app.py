@@ -471,7 +471,7 @@ def index():
         return _render()
 
     # GET
-    return _render()
+    return redirect(url_for("index"))
 
 # --- Login / Logout / Settings ---
 @app.route("/login", methods=["GET","POST"])

@@ -4,7 +4,6 @@
   const modoRadios    = document.querySelectorAll('input[name="modo"]');
   const printerSelect = document.getElementById('printer_ip');
   const copiesInput   = document.getElementById('copies');
-  const codigo        = document.getElementById('codigo');
   
   function populatePrinters(mode, selectedIp) {
     printerSelect.innerHTML = '';
@@ -68,4 +67,21 @@
     e.target.value = v;
     localStorage.setItem('copies', v);
   });
+
+  document.addEventListener("DOMContentLoaded", () => {
+  const form = document.querySelector("form");
+  if (form) {
+    form.addEventListener("submit", () => {
+      const codigo = document.getElementById("codigo");
+      if (codigo) codigo.value = "";
+    });
+  }
+
+  // Se a página for exibida após um redirect (PRG), limpa o campo código
+  window.addEventListener("pageshow", function () {
+    const codigo = document.getElementById("codigo");
+    if (codigo) codigo.value = "";
+  });
+});
+
 })();
