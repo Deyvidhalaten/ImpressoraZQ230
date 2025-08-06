@@ -4,8 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Impressão</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  
+  <!-- Link dinâmico para o estilo -->
+  <link id="theme-style" rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+      data-padrao="{{ url_for('static', filename='style.css') }}"
+      data-bistek="{{ url_for('static', filename='style-bistek.css') }}">
 </head>
+
 <body data-printers='{{ printers | tojson | safe }}'>
   <div class="container">
     <div class="nav">
@@ -17,6 +23,14 @@
         <a href="{{ url_for('login', next=url_for('settings')) }}">Admin</a>
       {% endif %}
     </div>
+
+     <!-- Seletor de Layouts -->
+    <!-- Seletor de Tema -->
+    <label for="tema">Tema de Estilo:</label>
+    <select id="tema" style="margin-bottom: 15px;">
+      <option value="padrao">Padrão</option>
+      <option value="bistek">Bistek</option>
+    </select>
 
     <h1>Imprimir EAN-13</h1>
     <form method="POST" action="{{ url_for('index') }}">
@@ -81,5 +95,19 @@
   </script>
   <!-- carrega seu script de forma deferida -->
   <script defer src="{{ url_for('static', filename='printer.js') }}"></script>
+
+  <!-- Script para troca de Layout -->
+  <script>
+  document.getElementById("tema").addEventListener("change", function () {
+    const temaSelecionado = this.value;
+    const link = document.getElementById("theme-style");
+
+    // Lê os atributos data-* com os caminhos já renderizados
+    const hrefPadrao = link.dataset.padrao;
+    const hrefBistek = link.dataset.bistek;
+
+    link.href = temaSelecionado === "bistek" ? hrefBistek : hrefPadrao;
+  });
+</script>
 </body>
 </html>
