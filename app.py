@@ -1,3 +1,4 @@
+from encodings.punycode import T
 import os
 import sys
 import ssl
@@ -360,19 +361,27 @@ def gerar_zpl_templateFLV(
     ]
     return "\n".join(lines)
 
-def normalize_codigo(codigo: str) -> str | None:
+def consulta_Base(codigo: str, db: dict) -> dict | None:
     """
-    Recebe um valor como "130249" ou "130249-?  
-    Retorna "13024-9" ou "3000001302490", ou None se inválido.
+    Consulta o código em um dicionário da base (FLV ou Floricultura).
+    Tenta primeiro como EAN-13 puro e depois como Cod.Prod formatado.
     """
-    # tira tudo que não é dígito
+    # Remove tudo que não é dígito
     chave = ''.join(c for c in codigo if c.isdigit())
-    # EAN-13?
-    if len(chave) == 13:
-        return chave
-    # Cod.Prod reduzido? de 4 a 12 dígitos => "XXXX-Y"
-    if 4 <= len(chave) <= 12:
-        return f"{chave[:-1]}-{chave[-1]}"
+    chave=chave.lstrip('0')
+    # Tenta como EAN direto
+    rec = db.get(chave)
+    if rec:
+        return rec
+
+    # Se não encontrar, tenta como código com hífen (XXXX-Y)
+    if len(chave) >= 2:
+        chave_formatado = f"{chave[:-1]}-{chave[-1]}"
+        rec = db.get(chave_formatado)
+        if rec:
+            return rec
+
+    # Se não encontrou de nenhuma forma, retorna None
     return None
 
 @app.route("/", methods=["GET", "POST"])
@@ -433,9 +442,9 @@ def index():
             copies = 1
 
         codigo_raw = request.form.get("codigo","").strip()
-        norm       = normalize_codigo(codigo_raw)
         db         = DB_FLV if modo=="FLV" else DB
-        rec        = db.get(norm)
+        rec       = consulta_Base(codigo_raw,db)
+
         if not rec:
             flash("❌ Produto não encontrado", "error")
             return _render()
