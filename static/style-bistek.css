@@ -18,8 +18,12 @@ body {
   }
   
   form {
-    background-image: url('../static/fundo-bistek.jpg');
-    background-size: contain;       /* Reduz a imagem para caber inteira */
+    width: 360px;              /* Aumenta a largura */
+    height: 500px;          /* Aumenta a Altura  */
+    max-width: 100%;           /* Garante responsividade */
+    background-image: url('../static/fundo-bistek.jpg'); /* adiciona  imagem dentro do form */
+    /*background-size: contain;       /* Reduz a imagem para caber inteira */
+    background-size: cover;
     background-repeat: no-repeat; /* não repete */
     background-position: center;  /* centraliza a imagem */
     padding: 20px;
