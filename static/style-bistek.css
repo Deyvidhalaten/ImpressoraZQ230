@@ -1,7 +1,15 @@
 /* static/style.css */
 body {
     font-family: Arial, sans-serif;
-    background-color: #f9f4f4;
+    /*background-color: #f9f4f4;*/
+    background-image: url('../static/fundo-bistek.png');
+    background-size: 36% auto;
+    /*background-size: cover;*/
+    background-repeat: no-repeat; /* não repete */
+    /*background-position: center;  /* centraliza a imagem */
+    background-position: absolute;
+    background-position-y: 70px;  /* distância do topo */
+    background-position-x: 435px; /* distância da esquerda */
     color: #333;
     margin: 0;
     padding: 20px;
@@ -12,16 +20,36 @@ body {
     margin: 0 auto;
   }
   
-  h1, h2 {
+ h1 {
+    text-align: center; /* centraliza o texto na horizontal */
+    color: #4CAF50;
+    /*margin-top: 0px; /* controla distância do topo */
+    /*margin-bottom: 20px; /* controla distância do que vem depois */
+  }
+
+  h2 {
     text-align: center;
     color: #4CAF50;
   }
   
+  .fundo-layout {
+    /*width: 360px;              /* Aumenta a largura */
+    /*height: 400px;          /* Aumenta a Altura  */
+    /*max-width: 100%;           /* Garante responsividade */
+    /*background-image: url('../static/fundo-bistek.png'); /* adiciona  imagem dentro do form */
+    /*background-size: contain;       /* Reduz a imagem para caber inteira */
+   /*background-size: cover;
+    background-repeat: no-repeat; /* não repete */
+    /*background-position: center;  /* centraliza a imagem */
+    /*border-radius: 8px;*/
+}
+
   form {
     width: 360px;              /* Aumenta a largura */
-    height: 500px;          /* Aumenta a Altura  */
+    height: 360px;          /* Aumenta a Altura  */
     max-width: 100%;           /* Garante responsividade */
-    background-image: url('../static/fundo-bistek.jpg'); /* adiciona  imagem dentro do form */
+    /*background-image: url('../static/fundo-bistek.png'); /* adiciona  imagem dentro do form */
+    /*background-size: 50% ;
     /*background-size: contain;       /* Reduz a imagem para caber inteira */
     background-size: cover;
     background-repeat: no-repeat; /* não repete */
