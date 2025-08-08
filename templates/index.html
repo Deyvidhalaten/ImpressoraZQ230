@@ -24,32 +24,32 @@
       {% endif %}
     </div>
 
-     <!-- Seletor de Layouts -->
-    <!-- Seletor de Tema -->
+     <!-- Seletor de Layout -->
     <label for="tema">Tema de Estilo:</label>
     <select id="tema" style="margin-bottom: 15px;">
       <option value="padrao">Padrão</option>
       <option value="bistek">Bistek</option>
     </select>
+    <div class="fundo-layout">
+      <h1>Imprimir EAN-13</h1>
+      <form method="POST" action="{{ url_for('index') }}">
+        <label for="codigo">Código EAN-13:</label>
+        <input type="text" id="codigo" name="codigo" required autocomplete="off">
 
-    <h1>Imprimir EAN-13</h1>
-    <form method="POST" action="{{ url_for('index') }}">
-      <label for="codigo">Código EAN-13:</label>
-      <input type="text" id="codigo" name="codigo" required autocomplete="off">
-
-      <fieldset style="margin-top:10px;">
-        <legend>Modo de Impressão:</legend>
-        <label>
-          <input type="radio" name="modo" value="Floricultura"
-            {% if modo == "Floricultura" %}checked{% endif %}>
-          Floricultura
-        </label>
-        <label>
-          <input type="radio" name="modo" value="FLV"
-            {% if modo == "FLV" %}checked{% endif %}>
-          FLV
-        </label>
-      </fieldset>
+        <fieldset style="margin-top:10px;">
+          <legend>Modo de Impressão:</legend>
+          <label>
+            <input type="radio" name="modo" value="Floricultura"
+              {% if modo == "Floricultura" %}checked{% endif %}>
+           Floricultura
+          </label>
+          <label>
+            <input type="radio" name="modo" value="FLV"
+              {% if modo == "FLV" %}checked{% endif %}>
+            FLV
+          </label>
+        </fieldset>
+      </div>
 
       <div class="form-inline">
         <div class="form-group">
