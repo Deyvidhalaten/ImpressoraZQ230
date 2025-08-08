@@ -1,23 +1,34 @@
 /* static/style.css */
 body {
     font-family: Arial, sans-serif;
-    /*background-color: #f9f4f4;*/
-    background-image: url('../static/fundo-bistek.png');
+    background-color: #f9f4f4;
+    /*background-image: url('../static/fundo-bistek.png');
     background-size: 36% auto;
     /*background-size: cover;*/
-    background-repeat: no-repeat; /* não repete */
+    /*background-repeat: no-repeat; /* não repete */
     /*background-position: center;  /* centraliza a imagem */
-    background-position: absolute;
+    /*background-position: absolute;
     background-position-y: 70px;  /* distância do topo */
-    background-position-x: 435px; /* distância da esquerda */
+    /*background-position-x: 435px; /* distância da esquerda */
     color: #333;
     margin: 0;
     padding: 20px;
   }
   
   .container {
-    max-width: 400px;
+    max-width: 410px;
+    height: 500px;         /* altura fixa */
+    /*width: 400px;          /* largura fixa */
     margin: 0 auto;
+    border-radius: 25px;
+    background-image: url('../static/fundo-bistek.png');
+    background-size: 100% auto;
+    background-size: cover;
+    background-repeat: no-repeat; /* não repete */
+    /*background-position: center;  /* centraliza a imagem */
+    background-position: absolute;
+    background-position-y: -30px;  /* distância do topo */
+    background-position-x: -50px; /* distância da esquerda */    
   }
   
  h1 {
@@ -32,18 +43,6 @@ body {
     color: #4CAF50;
   }
   
-  .fundo-layout {
-    /*width: 360px;              /* Aumenta a largura */
-    /*height: 400px;          /* Aumenta a Altura  */
-    /*max-width: 100%;           /* Garante responsividade */
-    /*background-image: url('../static/fundo-bistek.png'); /* adiciona  imagem dentro do form */
-    /*background-size: contain;       /* Reduz a imagem para caber inteira */
-   /*background-size: cover;
-    background-repeat: no-repeat; /* não repete */
-    /*background-position: center;  /* centraliza a imagem */
-    /*border-radius: 8px;*/
-}
-
   form {
     width: 360px;              /* Aumenta a largura */
     height: 360px;          /* Aumenta a Altura  */
