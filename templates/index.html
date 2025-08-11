@@ -13,25 +13,25 @@
 </head>
 
 <body data-printers='{{ printers | tojson | safe }}'>
-  <div class="container">
-    <div class="nav">
-      <a href="{{ url_for('index') }}">Impressão</a>
-      {% if session.get('logged_in') %}
-        <a href="{{ url_for('settings') }}">Configurar Impressora</a>
-        <a href="{{ url_for('logout') }}">Logout</a>
-      {% else %}
-        <a href="{{ url_for('login', next=url_for('settings')) }}">Admin</a>
-      {% endif %}
-    </div>
-
-     <!-- Seletor de Layout -->
+   <!-- Seletor de Layout -->
     <label for="tema">Tema de Estilo:</label>
     <select id="tema" style="margin-bottom: 15px;">
       <option value="padrao">Padrão</option>
       <option value="bistek">Bistek</option>
     </select>
 
-    <h1>Imprimir EAN-13</h1>
+  <div class="container">
+    <div class="nav">
+      <a class="link1" href="{{ url_for('index') }}" >Impressão</a>
+      {% if session.get('logged_in') %}
+        <a class="link2" href="{{ url_for('settings') }}">Configurar Impressora</a>
+        <a class="link3" href="{{ url_for('logout') }}">Logout</a>
+      {% else %}
+        <a class="link4" href="{{ url_for('login', next=url_for('settings')) }}">Admin</a>
+      {% endif %}
+    </div>
+
+    <h1 class="texto1">IMPRIMIR EAN-13</h1>
     <form method="POST" action="{{ url_for('index') }}">
       <label for="codigo">Código EAN-13:</label>
       <input type="text" id="codigo" name="codigo" required autocomplete="off">
@@ -69,8 +69,8 @@
       </div>
 
       <div style="margin-top:15px;">
-        <button type="submit" name="action" value="print">Imprimir</button>
-        <button type="submit" name="action" value="load" formnovalidate>
+        <button id="imprimir" type="submit" name="action" value="print">Imprimir</button>
+        <button id="carga" type="submit" name="action" value="load" formnovalidate>
           Enviar Carga
         </button>
       </div>
