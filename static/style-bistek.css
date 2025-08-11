@@ -2,58 +2,39 @@
 body {
     font-family: Arial, sans-serif;
     background-color: #f9f4f4;
-    /*background-image: url('../static/fundo-bistek.png');
-    background-size: 36% auto;
-    /*background-size: cover;*/
-    /*background-repeat: no-repeat; /* não repete */
-    /*background-position: center;  /* centraliza a imagem */
-    /*background-position: absolute;
-    background-position-y: 70px;  /* distância do topo */
-    /*background-position-x: 435px; /* distância da esquerda */
     color: #333;
     margin: 0;
     padding: 20px;
   }
   
   .container {
-    max-width: 410px;
-    height: 500px;         /* altura fixa */
-    /*width: 400px;          /* largura fixa */
+    max-width: 410px;        /* largura máxima */
+    height: 510px;           /* altura fixa */
     margin: 0 auto;
-    border-radius: 25px;
+    border-radius: 10px;
+
     background-image: url('../static/fundo-bistek.png');
-    background-size: 100% auto;
-    background-size: cover;
-    background-repeat: no-repeat; /* não repete */
-    /*background-position: center;  /* centraliza a imagem */
-    background-position: absolute;
-    background-position-y: -30px;  /* distância do topo */
-    background-position-x: -50px; /* distância da esquerda */    
+    background-size: 150% 120%; /* largura e altura em porcentagem */
+    background-repeat: no-repeat;
+    background-position: -50px -30px; /* deslocamento horizontal e vertica */    
   }
-  
+
+
  h1 {
-    text-align: center; /* centraliza o texto na horizontal */
-    color: #4CAF50;
-    /*margin-top: 0px; /* controla distância do topo */
-    /*margin-bottom: 20px; /* controla distância do que vem depois */
+    color: #df2424;
+    font-weight: bold;
   }
 
   h2 {
-    text-align: center;
     color: #4CAF50;
   }
   
   form {
     width: 360px;              /* Aumenta a largura */
-    height: 360px;          /* Aumenta a Altura  */
+    height: 370px;            /* Aumenta a Altura  */
     max-width: 100%;           /* Garante responsividade */
-    /*background-image: url('../static/fundo-bistek.png'); /* adiciona  imagem dentro do form */
-    /*background-size: 50% ;
-    /*background-size: contain;       /* Reduz a imagem para caber inteira */
-    background-size: cover;
-    background-repeat: no-repeat; /* não repete */
-    background-position: center;  /* centraliza a imagem */
-    padding: 20px;
+    margin-left: 15px;
+    padding: 10px;
     border-radius: 8px;
     box-shadow: 0 2px 6px rgba(0,0,0,0.1);
   }
@@ -61,7 +42,16 @@ body {
   label {
     display: block;
     margin-top: 10px;
+    font-weight: bold;
+    color: #4CAF50;
+    font-weight: bold;
   }
+
+  legend {
+  font-weight: bold;
+  color: #2e7d32; /* verde escuro */
+}
+  
   
   input[type="text"], input[type="password"], button {
     width: 100%;
@@ -70,8 +60,56 @@ body {
     font-size: 1em;
     border: 1px solid #ccc;
     border-radius: 4px;
+    color: #4CAF50; 
+
   }
+
+  /* Radios com cor personalizada */
+  input[type="radio"] {
+  accent-color: #4CAF50; /* verde, mas pode trocar */
+  width: 18px;  /* opcional: aumenta tamanho */
+  height: 18px;
+  cursor: pointer;
+  color: #4CAF50; 
+  }
+
+  /* Todos inputs do tipo number */
+  input[type="number"] {
+  border: 2px solid #4CAF50; /* borda verde */
+  background-color: #4CAF50;
+  color: #ffffff;
+  }
+
+input[type="number"]:focus {
+  border-color: #388e3c; /* borda verde escura ao focar */
+  box-shadow: 0 0 5px #4CAF50;
+}
+
+/* Select com id "printer_ip" */
+#printer_ip {
+  background-color: #4CAF50;
+  color: #ffffff;
+  cursor: pointer;
+}
+#printer_ip:focus {
+  border-color: #388e3c;
+  box-shadow: 0 0 5px #4CAF50;
+}
   
+  #carga {
+  background: #df2424; /*Vermelho*/
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  font-size: 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+#carga:hover {
+  background-color: #a01616; /* vermelho mais escuro no hover */
+}
+
   button {
     background: #4CAF50;
     color: #fff;
@@ -87,13 +125,23 @@ body {
   .nav {
     text-align: center;
     margin-bottom: 20px;
+    /*padding-top: 20px; /* distancia vertical para todo o bloco */
   }
   
   .nav a {
     margin: 0 10px;
-    color: #4CAF50;
+    color: #ffffff;
     text-decoration: none;
+    display: inline-block; /* garante que o padding funcione bem */
+    padding-top: 0px;      /* empurra o texto dentro do link */
   }
+  
+  /*ajusta cada link separadamente com transform */
+  .link1 { transform: translate(120px, 20px); }  /* X = 10px, Y = 5px */
+  .link2 { transform: translate(110px, 20px); }
+  .link3 { transform: translate(100px, 20px); }
+  .link4 { transform: translate(110px, 20px); }
+  .texto1 { transform: translate(73px, 18px); }
   
   .nav a:hover {
     text-decoration: underline;
