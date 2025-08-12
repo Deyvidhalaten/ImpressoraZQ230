@@ -8,67 +8,60 @@ body {
   }
   
   .container {
-    max-width: 410px;        /* largura máxima */
-    height: 510px;           /* altura fixa */
+    max-width: 380px;        /* largura máxima */
+    height: 489px;           /* altura fixa */
     margin: 0 auto;
     border-radius: 10px;
-
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);  
+    padding: 10px;
     background-image: url('../static/fundo-bistek.png');
     background-size: 150% 120%; /* largura e altura em porcentagem */
     background-repeat: no-repeat;
-    background-position: -50px -30px; /* deslocamento horizontal e vertica */    
+    background-position: -60px -30px; /* deslocamento horizontal e vertica */  
+    
   }
 
 
  h1 {
+    text-align: center;
     color: #df2424;
     font-weight: bold;
   }
 
   h2 {
-    color: #4CAF50;
+    color: #2e7d32;
   }
   
   form {
-    width: 360px;              /* Aumenta a largura */
-    height: 370px;            /* Aumenta a Altura  */
-    max-width: 100%;           /* Garante responsividade */
-    margin-left: 15px;
     padding: 10px;
-    border-radius: 8px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
   }
   
   label {
     display: block;
     margin-top: 10px;
     font-weight: bold;
-    color: #4CAF50;
-    font-weight: bold;
+    color: #2e7d32;
   }
 
   legend {
   font-weight: bold;
   color: #2e7d32; /* verde escuro */
 }
-  
-  
-  input[type="text"], input[type="password"], button {
-    width: 100%;
+    
+  input[type="text"], input[type="password"] {
+    width: 93%;
     padding: 10px;
     margin-top: 6px;
     font-size: 1em;
     border: 1px solid #ccc;
     border-radius: 4px;
-    color: #4CAF50; 
+    color: #020503; 
 
   }
 
   /* Radios com cor personalizada */
   input[type="radio"] {
   accent-color: #4CAF50; /* verde, mas pode trocar */
-  width: 18px;  /* opcional: aumenta tamanho */
-  height: 18px;
   cursor: pointer;
   color: #4CAF50; 
   }
@@ -111,6 +104,13 @@ input[type="number"]:focus {
 }
 
   button {
+    width: 100%;
+    padding: 10px;
+    margin-top: 6px;
+    font-size: 1em;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    color: #4CAF50; 
     background: #4CAF50;
     color: #fff;
     border: none;
@@ -141,7 +141,7 @@ input[type="number"]:focus {
   .link2 { transform: translate(110px, 20px); }
   .link3 { transform: translate(100px, 20px); }
   .link4 { transform: translate(110px, 20px); }
-  .texto1 { transform: translate(73px, 18px); }
+  /*.texto1 { transform: translate(73px, 18px); }*/
   
   .nav a:hover {
     text-decoration: underline;
