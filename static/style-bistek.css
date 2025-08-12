@@ -9,7 +9,7 @@ body {
   
   .container {
     max-width: 380px;        /* largura máxima */
-    height: 489px;           /* altura fixa */
+    height: 508px;           /* altura fixa */
     margin: 0 auto;
     border-radius: 10px;
     box-shadow: 0 2px 6px rgba(0,0,0,0.1);  
@@ -26,19 +26,22 @@ body {
   }
   
   form {
-    padding: 10px;
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 22px;
+    padding-bottom: 10px;
   }
   
   label {
     display: block;
     margin-top: 10px;
     font-weight: bold;
-    color: #2e7d32;
+    /*color: #2e7d32;*/
   }
 
   legend {
   font-weight: bold;
-  color: #2e7d32; /* verde escuro */
+  /*color: #2e7d32; /* verde escuro */
 }
     
   input[type="text"], input[type="password"] {
@@ -54,27 +57,27 @@ body {
 
   /* Radios com cor personalizada */
   input[type="radio"] {
-  accent-color: #4CAF50; /* verde, mas pode trocar */
+  /*accent-color: #4CAF50; /* verde, mas pode trocar */
   cursor: pointer;
-  color: #4CAF50; 
+  /*color: #4CAF50; */
   }
 
   /* Todos inputs do tipo number */
   input[type="number"] {
-  border: 2px solid #4CAF50; /* borda verde */
-  background-color: #4CAF50;
-  color: #ffffff;
+  /*border: 2px solid #4CAF50; /* borda verde */
+  /*background-color: #4CAF50;*/
+  color: #000000;
   }
 
 input[type="number"]:focus {
-  border-color: #388e3c; /* borda verde escura ao focar */
+  /*border-color: #388e3c; /* borda verde escura ao focar */
   box-shadow: 0 0 5px #4CAF50;
 }
 
 /* Select com id "printer_ip" */
 #printer_ip {
-  background-color: #4CAF50;
-  color: #ffffff;
+  /*background-color: #4CAF50;*/
+  color: #020202;
   cursor: pointer;
 }
 #printer_ip:focus {
@@ -167,14 +170,7 @@ h1.texto1 {
   color: #df2424;
   font-weight: bold;
 }
-  
-  /*ajusta cada link separadamente com transform */
-  .link1 { transform: translate(120px, 20px); }  /* X = 10px, Y = 5px */
-  .link2 { transform: translate(110px, 20px); }
-  .link3 { transform: translate(100px, 20px); }
-  .link4 { transform: translate(110px, 20px); }
-  /*.texto1 { transform: translate(73px, 18px); }*/
-  
+    
   .flash {
     margin-top: 15px;
     padding: 10px;
