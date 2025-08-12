@@ -14,18 +14,11 @@ body {
     border-radius: 10px;
     box-shadow: 0 2px 6px rgba(0,0,0,0.1);  
     padding: 10px;
-    background-image: url('../static/fundo-bistek.png');
+    background-image: url('../static/images/fundo-bistek.png');
     background-size: 150% 120%; /* largura e altura em porcentagem */
     background-repeat: no-repeat;
-    background-position: -60px -30px; /* deslocamento horizontal e vertica */  
+    background-position: -50px -30px; /* deslocamento horizontal e vertica */  
     
-  }
-
-
- h1 {
-    text-align: center;
-    color: #df2424;
-    font-weight: bold;
   }
 
   h2 {
@@ -122,19 +115,58 @@ input[type="number"]:focus {
     background: #45a049;
   }
   
-  .nav {
-    text-align: center;
-    margin-bottom: 20px;
-    /*padding-top: 20px; /* distancia vertical para todo o bloco */
-  }
-  
-  .nav a {
-    margin: 0 10px;
-    color: #ffffff;
-    text-decoration: none;
-    display: inline-block; /* garante que o padding funcione bem */
-    padding-top: 0px;      /* empurra o texto dentro do link */
-  }
+.nav {
+  display: flex;
+  align-items: center;         /* alinha verticalmente centro */
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding: 0px 0;
+  background: transparent;
+}
+
+/* Logo ocupa 20% */
+.nav-logo {
+  flex: 0 0 20%;
+}
+
+.nav-logo img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Links ocupam 0% */
+.nav-links {
+  flex: 0 0 60%;
+  display: flex;
+  justify-content: flex-end;   /* joga os links para a direita */
+  gap: 15px;                   /* espaço entre os links */
+}
+
+.nav-links a {
+  color: #fff;
+  text-decoration: none;
+  font-weight: bold;
+  padding: 5px 10px;
+}
+
+.nav-links a:hover {
+  text-decoration: underline;
+}
+
+/* Remover os transform usados para posicionar links individualmente */
+.link1, .link2, .link3, .link4 {
+  transform: none !important;
+}
+
+/* Ajustar título para não invadir nav */
+h1.texto1 {
+  margin-top: 10px;
+  margin-bottom: 20px;
+  text-align: center;
+  color: #df2424;
+  font-weight: bold;
+}
   
   /*ajusta cada link separadamente com transform */
   .link1 { transform: translate(120px, 20px); }  /* X = 10px, Y = 5px */
@@ -142,10 +174,6 @@ input[type="number"]:focus {
   .link3 { transform: translate(100px, 20px); }
   .link4 { transform: translate(110px, 20px); }
   /*.texto1 { transform: translate(73px, 18px); }*/
-  
-  .nav a:hover {
-    text-decoration: underline;
-  }
   
   .flash {
     margin-top: 15px;
