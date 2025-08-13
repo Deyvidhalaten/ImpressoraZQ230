@@ -94,16 +94,16 @@
 
   <!-- Script para troca de Layout -->
   <script>
-  document.getElementById("tema").addEventListener("change", function () {
-    const temaSelecionado = this.value;
+    window.addEventListener("DOMContentLoaded", function () {
+    const tema = localStorage.getItem("temaSelecionado") || "bistek"; // padrão inicial
     const link = document.getElementById("theme-style");
-
-    // Lê os atributos data-* com os caminhos já renderizados
+    
+    // Caminhos renderizados pelo Jinja
     const hrefPadrao = link.dataset.padrao;
     const hrefBistek = link.dataset.bistek;
 
-    link.href = temaSelecionado === "bistek" ? hrefBistek : hrefPadrao;
-  });
-</script>
+    link.href = tema === "bistek" ? hrefBistek : hrefPadrao;
+    });
+  </script>
 </body>
 </html>
