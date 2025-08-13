@@ -16,6 +16,14 @@
       <a href="{{ url_for('logout') }}">Logout</a>
     </div>
 
+    <!-- Seletor de Layout -->
+    <label for="tema">Tema de Estilo:</label>
+    <select id="tema" style="margin-bottom: 15px;">
+      <option value="padrao">Padrão</option>
+      <option value="bistek">Bistek</option>
+    </select>
+
+
 <!-- Botão vermelho de Encerrar Sistema, agora centralizado -->
 <form method="POST"
       action="{{ url_for('shutdown') }}"
@@ -49,5 +57,19 @@
       {% endfor %}
     {% endwith %}
   </div>
+
+  <!-- Script para troca de Layout -->
+  <script>
+  document.getElementById("tema").addEventListener("change", function () {
+    const temaSelecionado = this.value;
+    const link = document.getElementById("theme-style");
+
+    // Lê os atributos data-* com os caminhos já renderizados
+    const hrefPadrao = link.dataset.padrao;
+    const hrefBistek = link.dataset.bistek;
+
+    link.href = temaSelecionado === "bistek" ? hrefBistek : hrefPadrao;
+  });
+</script>
 </body>
 </html>
