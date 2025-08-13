@@ -170,6 +170,7 @@ h1.texto1 {
     border-left: 4px solid #f44336;
   }
   .flash-success {
+    margin-top: 15px;
     background: #ddffdd;
     border-left-color: #4CAF50;
   }
