@@ -4,21 +4,31 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Impressão</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  
+  <!-- Link dinâmico para o estilo -->
+  <link id="theme-style" rel="stylesheet"
+      href="{{ url_for('static', filename='style-bistek.css') }}"
+      data-padrao="{{ url_for('static', filename='style.css') }}"
+      data-bistek="{{ url_for('static', filename='style-bistek.css') }}">
 </head>
+
 <body data-printers='{{ printers | tojson | safe }}'>
+   
   <div class="container">
     <div class="nav">
-      <a href="{{ url_for('index') }}">Impressão</a>
-      {% if session.get('logged_in') %}
-        <a href="{{ url_for('settings') }}">Configurar Impressora</a>
-        <a href="{{ url_for('logout') }}">Logout</a>
-      {% else %}
-        <a href="{{ url_for('login', next=url_for('settings')) }}">Admin</a>
-      {% endif %}
-    </div>
-
-    <h1>Imprimir EAN-13</h1>
+    <div class="nav-logo">
+    <img src="" />
+  </div>
+  <div class="nav-links">
+    {% if session.get('logged_in') %}
+      <a class="link2" href="{{ url_for('settings') }}">Configurações</a>
+      <a class="link3" href="{{ url_for('logout') }}">Logout</a>
+    {% else %}
+      <a class="link4" href="{{ url_for('login', next=url_for('settings')) }}">Admin</a>
+    {% endif %}
+  </div>
+  </div>
+    <h1 class="texto1">IMPRIMIR EAN-13</h1>
     <form method="POST" action="{{ url_for('index') }}">
       <label for="codigo">Código EAN-13:</label>
       <input type="text" id="codigo" name="codigo" required autocomplete="off">
@@ -56,8 +66,8 @@
       </div>
 
       <div style="margin-top:15px;">
-        <button type="submit" name="action" value="print">Imprimir</button>
-        <button type="submit" name="action" value="load" formnovalidate>
+        <button id="imprimir" type="submit" name="action" value="print">Imprimir</button>
+        <button id="carga" type="submit" name="action" value="load" formnovalidate>
           Enviar Carga
         </button>
       </div>
@@ -81,5 +91,19 @@
   </script>
   <!-- carrega seu script de forma deferida -->
   <script defer src="{{ url_for('static', filename='printer.js') }}"></script>
+
+  <!-- Script para troca de Layout -->
+  <script>
+    window.addEventListener("DOMContentLoaded", function () {
+    const tema = localStorage.getItem("temaSelecionado") || "bistek"; // padrão inicial
+    const link = document.getElementById("theme-style");
+    
+    // Caminhos renderizados pelo Jinja
+    const hrefPadrao = link.dataset.padrao;
+    const hrefBistek = link.dataset.bistek;
+
+    link.href = tema === "bistek" ? hrefBistek : hrefPadrao;
+    });
+  </script>
 </body>
 </html>
