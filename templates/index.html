@@ -13,16 +13,10 @@
 </head>
 
 <body data-printers='{{ printers | tojson | safe }}'>
-   <!-- Seletor de Layout -->
-    <label for="tema">Tema de Estilo:</label>
-    <select id="tema" style="margin-bottom: 15px;">
-      <option value="padrao">Padrão</option>
-      <option value="bistek">Bistek</option>
-    </select>
-
+   
   <div class="container">
-<div class="nav">
-  <div class="nav-logo">
+    <div class="nav">
+    <div class="nav-logo">
     <img src="" />
   </div>
   <div class="nav-links">
@@ -33,7 +27,7 @@
       <a class="link4" href="{{ url_for('login', next=url_for('settings')) }}">Admin</a>
     {% endif %}
   </div>
-</div>
+  </div>
     <h1 class="texto1">IMPRIMIR EAN-13</h1>
     <form method="POST" action="{{ url_for('index') }}">
       <label for="codigo">Código EAN-13:</label>
