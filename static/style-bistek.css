@@ -1,7 +1,7 @@
 /* static/style.css */
 body {
     font-family: Arial, sans-serif;
-    background-color: #f9f4f4;
+    background-color: #d7d2d2;
     color: #333;
     margin: 0;
     padding: 20px;
@@ -17,7 +17,7 @@ body {
     background-image: url('../static/images/fundo-bistek.png');
     background-size: 150% 120%; /* largura e altura em porcentagem */
     background-repeat: no-repeat;
-    background-position: -50px -30px; /* deslocamento horizontal e vertica */  
+    background-position: -53px -30px; /* deslocamento horizontal e vertica */  
     
   }
 
