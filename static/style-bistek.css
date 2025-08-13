@@ -36,13 +36,11 @@ body {
     display: block;
     margin-top: 10px;
     font-weight: bold;
-    /*color: #2e7d32;*/
   }
 
   legend {
   font-weight: bold;
-  /*color: #2e7d32; /* verde escuro */
-}
+  }
     
   input[type="text"], input[type="password"] {
     width: 93%;
@@ -57,26 +55,20 @@ body {
 
   /* Radios com cor personalizada */
   input[type="radio"] {
-  /*accent-color: #4CAF50; /* verde, mas pode trocar */
   cursor: pointer;
-  /*color: #4CAF50; */
   }
 
   /* Todos inputs do tipo number */
   input[type="number"] {
-  /*border: 2px solid #4CAF50; /* borda verde */
-  /*background-color: #4CAF50;*/
   color: #000000;
   }
 
 input[type="number"]:focus {
-  /*border-color: #388e3c; /* borda verde escura ao focar */
   box-shadow: 0 0 5px #4CAF50;
 }
 
 /* Select com id "printer_ip" */
 #printer_ip {
-  /*background-color: #4CAF50;*/
   color: #020202;
   cursor: pointer;
 }
