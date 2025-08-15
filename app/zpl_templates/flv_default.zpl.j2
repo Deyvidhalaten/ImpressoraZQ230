@@ -1,0 +1,18 @@
+^XA
+^PRD^FS
+^LS{{ ls }}^FS
+^LH0,0^FS
+^LL400^FS
+^JMA^FS
+^BY2
+^FO90,50^A0N,50,20^FD{{ texto }}^FS
+{% set MAX_LINHAS = 16 %}
+{% for i in range(MAX_LINHAS) %}
+^FO90,{{ 115 + (i*20) }}^A0N,15,20^FD{{ (infnutri[i] if infnutri|length > i else '') | default('') }}^FS
+{% endfor %}
+^FO130,440^A0N,25,20^FD{{ codprod }}^FS
+^FO120,460^BEN,50,Y,N^FD{{ ean }}^FS
+^FO90,550^A0N,40,30^FDValidade: {{ validade }} Dias^FS
+^FO90,590^A0N,40,30^FDProduzido: {{ data }}^FS
+^PQ{{ copies }},0,1,N
+^XZ

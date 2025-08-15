@@ -8,6 +8,8 @@ import socket
 import csv
 import json as _json
 from datetime import datetime, timedelta
+import shutil
+from pathlib import Path
 
 # --- imports de terceiros ---
 import urllib3
@@ -22,12 +24,21 @@ from flask import (
     json as flask_json,
 )
 from PIL import Image, ImageFont
+from jinja2 import Environment, FileSystemLoader, TemplateNotFound
+TEMPLATES_DIR = os.path.join(
+    os.environ.get("BISTEK_DATA_DIR", os.path.join(os.path.expanduser("~"), "AppData", "Local", "BistekPrinter")),  # fallback
+    "zpl_templates"
+)
+TEMPLATES_DIR = r"C:\ProgramData\BistekPrinter\zpl_templates"
 
+_zpl_env = Environment(
+    loader=FileSystemLoader(TEMPLATES_DIR),
+    autoescape=False,        # ZPL é texto puro
+    trim_blocks=True,
+    lstrip_blocks=True,
+)
 # --- imports locais ---
 from printer_zq230 import ZQ230Printer  # Módulo de socket/ZPL
-
-# --- configuração SSL (evita warnings de certificado) ---
-ssl._create_default_https_context = ssl._create_unverified_context
 
 # --- configuração do Flask e paths ---
 BASE_DIR = (
@@ -172,6 +183,8 @@ def load_printer_map():
                 'ls_flv':  int(row.get('ls_flv', 0)),
             })
     return maps
+
+
 
 #acrescenta uma linha com data/hora, tipo de evento, IP, impressora (se houver) e detalhes.
 def append_log(evento: str, ip: str = "", impressora: str = "", detalhes: str = ""):

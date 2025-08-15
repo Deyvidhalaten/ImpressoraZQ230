@@ -36,3 +36,5 @@ timestamp,evento,ip,loja,copies
 2025-07-11 11:32:38,print,10.4.30.42,10.4.30.116,"ean=3000030447506,codprod=304475-0,copies=10,modo=Floricultura"
 2025-07-12 12:05:06,print,10.4.30.42,10.4.30.116,"ean=3000000389201,codprod=3892-0,copies=10,modo=Floricultura"
 2025-07-12 12:05:46,print,10.4.30.42,10.4.30.116,"ean=3000000397138,codprod=3971-3,copies=10,modo=Floricultura"
+2025-08-15 13:20:49,startup,,,
+2025-08-15 13:20:56,shutdown,,,
