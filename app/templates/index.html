@@ -21,15 +21,15 @@
   </div>
   <div class="nav-links">
     {% if session.get('logged_in') %}
-      <a class="link2" href="{{ url_for('settings') }}">Configurações</a>
-      <a class="link3" href="{{ url_for('logout') }}">Logout</a>
+      <a class="link2" href="{{ url_for('admin.settings') }}">Configurações</a>
+      <a class="link3" href="{{ url_for('admin.logout') }}">Logout</a>
     {% else %}
-      <a class="link4" href="{{ url_for('login', next=url_for('settings')) }}">Admin</a>
+      <a class="link4" href="{{ url_for('admin.login', next=url_for('admin.settings')) }}">Admin</a>
     {% endif %}
   </div>
   </div>
     <h1 class="texto1">IMPRIMIR EAN-13</h1>
-    <form method="POST" action="{{ url_for('index') }}">
+    <form method="POST" action="{{ url_for('main.index') }}">
       <label for="codigo">Código EAN-13:</label>
       <input type="text" id="codigo" name="codigo" required autocomplete="off">
 

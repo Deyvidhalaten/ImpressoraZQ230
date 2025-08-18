@@ -9,11 +9,11 @@
 <body>
   <div class="container">
     <div class="nav">
-      <a href="/">Voltar</a>
+      <a href="{{ url_for('main.index') }}">Voltar</a>
     </div>
 
     <h1>Administração</h1>
-    <form method="POST" action="/login">
+      <form method="POST" action="{{ url_for('admin.login') }}">
       <label for="username">Usuário:</label>
       <input type="text" id="username" name="username" required>
       <label for="password">Senha:</label>

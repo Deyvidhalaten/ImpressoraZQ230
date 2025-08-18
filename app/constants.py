@@ -7,7 +7,7 @@ BASE_DIR = (
     else os.path.dirname(__file__)
 )
 
-# Arquivos (mesmo nomes que você já usava)
+# Arquivos
 CONFIG_FILE  = os.path.join(BASE_DIR, 'config.txt')
 CSV_FILE     = os.path.join(BASE_DIR, 'baseFloricultura.csv')
 CSV_FILE2    = os.path.join(BASE_DIR, 'baseFatiados.csv')
@@ -20,7 +20,7 @@ DEFAULT_PORTA    = 9100
 DEFAULT_LS_FLOR  = -40
 DEFAULT_LS_FLV   = -20
 
-# Credenciais (por enquanto)
+# Credenciais
 SHUTDOWN_PASSWORD = "admin"
 USUARIO           = "admin"
 SENHA             = "1234"

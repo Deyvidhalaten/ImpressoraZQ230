@@ -1,0 +1,16 @@
+timestamp,evento,ip,impressora,detalhes
+2025-08-18 09:10:32,startup,,,
+2025-08-18 09:10:36,shutdown,,,
+2025-08-18 09:14:53,startup,,,
+2025-08-18 09:32:23,startup,,,
+2025-08-18 10:06:56,startup,,,
+2025-08-18 10:22:51,startup,,,
+2025-08-18 10:43:08,startup,,,
+2025-08-18 10:45:28,startup,,,
+2025-08-18 10:46:22,startup,,,
+2025-08-18 12:04:29,startup,,,
+2025-08-18 12:06:12,admin.shutdown,,,
+2025-08-18 12:06:17,startup,,,
+2025-08-18 12:07:01,startup,,,
+2025-08-18 12:07:34,mapping_add,10.17.30.2,,"loja=1, ls_flor=0, ls_flv=0"
+2025-08-18 12:07:42,mapping_delete,10.17.30.2,teste,"loja=1, ip=1.1.1.1"

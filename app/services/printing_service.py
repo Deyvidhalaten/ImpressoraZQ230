@@ -1,5 +1,5 @@
 import socket
-from ..constants import DEFAULT_PORTA as PORTA_IMPRESSORA
+from app.constants import DEFAULT_PORTA as PORTA_IMPRESSORA
 
 def enviar_para_impressora_ip(zpl: str, ip: str, porta: int = PORTA_IMPRESSORA, timeout: float = 1.0) -> bool:
     try:

@@ -9,10 +9,10 @@
 <body>
   <div class="container">
     <div class="nav">
-      <a href="{{ url_for('index') }}">Impressão</a>
-      <a href="{{ url_for('printers') }}">Impressoras</a>
-      <a href="{{ url_for('logs') }}" class="active">Logs</a>
-      <a href="{{ url_for('logout') }}">Logout</a>
+      <a href="{{ url_for('main.index') }}">Impressão</a>
+      <a href="{{ url_for('admin.printers') }}">Impressoras</a>
+      <a href="{{ url_for('admin.logs') }}" class="active">Logs</a>
+      <a href="{{ url_for('admin.logout') }}">Logout</a>
     </div>
 
     <h1>Histórico de Logs</h1>

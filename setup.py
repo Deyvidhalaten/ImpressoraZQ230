@@ -10,9 +10,8 @@ includefiles = [
     ("app/templates", "app/templates"),
     ("app/static", "app/static"),
     ("app/zpl_templates", "app/zpl_templates"),
-    ("app/seeds", "app/seeds"),                 # << seeds vão no build
-    # Se ainda precisar do módulo auxiliar:
-    ("printer_zq230.py", "app/printer_zq230.py"),
+    ("app/seeds", "app/seeds"),
+    ("app/printer_zq230.py", "app/printer_zq230.py"),
     (
         os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts", "arial.ttf"),
         "arial.ttf",
@@ -37,5 +36,5 @@ setup(
     version="1.1.0",
     description="App de Impressão de EAN-13 via Flask",
     options={"build_exe": build_exe_options},
-    executables=[Executable(script="app/app.py", base=base, target_name="ImpressoraApp.exe")]
+    executables=[Executable(script="app/__main__.py", base=base, target_name="ImpressoraApp.exe")]
 )
