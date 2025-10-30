@@ -40,7 +40,7 @@ exe = EXE(
     upx=True,
     console=False,
     icon=None,
-    single_file=True  # <- Garante que gere um executável único
+    single_file=True
 )
 
 coll = COLLECT(

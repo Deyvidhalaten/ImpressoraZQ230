@@ -44,7 +44,7 @@ def log_exception(message: str, **meta):
 # -------- Compatibilidade com sua rota /logs (CSV “compacto”) --------
 def append_log(evento: str, ip: str = "", impressora: str = "", detalhes: str = ""):
     """
-    Mantém o CSV para sua tela /logs atual.
+    Mantém o CSV para a tela /logs atual.
     """
     if LOG_CSV is None:
         return
@@ -57,7 +57,7 @@ def append_log(evento: str, ip: str = "", impressora: str = "", detalhes: str = 
         ts = time.strftime("%Y-%m-%d %H:%M:%S")
         w.writerow([ts, evento, ip, impressora, detalhes])
 
-    # Além do CSV, já aproveita e dispara no logger de serviço
+    # Além do CSV, dispara logger de serviço
     log_service(
         f"csv_log/{evento}",
         ip=ip, impressora=impressora, detalhes=detalhes
