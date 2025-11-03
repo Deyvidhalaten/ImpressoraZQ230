@@ -27,3 +27,8 @@ setx SSL_CERT_FILE "C:\certs\corp-root.pem"
 Instalar Dependencia -> pip install pyinstaller
 Executar no CMD para gerar um executavel Criptografado ->  pyinstaller ImpressoraApp.spec
  pyinstaller --onefile --name ImpressoraApp app.py
+
+ Limpar cache
+
+ python -m compileall -b .
+for /r %i in (__pycache__) do rmdir /s /q "%i"

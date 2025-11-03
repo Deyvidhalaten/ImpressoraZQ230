@@ -33,37 +33,33 @@
       <label for="codigo">Código EAN-13:</label>
       <input type="text" id="codigo" name="codigo" required autocomplete="off">
 
-      <fieldset style="margin-top:10px;">
-        <legend>Modo de Impressão:</legend>
-        <label>
-          <input type="radio" name="modo" value="Floricultura"
-            {% if modo == "Floricultura" %}checked{% endif %}>
-          Floricultura
-        </label>
-        <label>
-          <input type="radio" name="modo" value="FLV"
-            {% if modo == "FLV" %}checked{% endif %}>
-          FLV
-        </label>
-      </fieldset>
+<div class="form-inline">
+  <div class="form-group">
+    <label for="modo">Tipo de Impressão:</label>
+    <select name="modo" id="modo" required>
+      {% for chave, exibicao in modos_disponiveis %}
+        <option value="{{ chave }}" {% if modo == chave %}selected{% endif %}>{{ exibicao }}</option>
+      {% endfor %}
+    </select>
+  </div>
 
-      <div class="form-inline">
-        <div class="form-group">
-          <label for="copies">Cópias (1–100):</label>
-          <input 
-            type="number" 
-            id="copies" 
-            name="copies" 
-            min="1" max="100" required
-          />
-        </div>
-        <div class="form-group">
-          <label for="printer_ip">Impressora:</label>
-          <select name="printer_ip" id="printer_ip" required>
-            <!-- será preenchido pelo printer.js -->
-          </select>
-        </div>
-      </div>
+  <div class="form-group">
+    <label for="copies">Cópias:</label>
+    <input 
+      type="number" 
+      id="copies" 
+      name="copies" 
+      min="1" max="100" required
+    />
+  </div>
+
+  <div class="form-group">
+    <label for="printer_ip">Impressora:</label>
+    <select name="printer_ip" id="printer_ip" required>
+      <!-- será preenchido pelo printer.js -->
+    </select>
+  </div>
+</div>
 
       <div style="margin-top:15px;">
         <button id="imprimir" type="submit" name="action" value="print">Imprimir</button>

@@ -16,18 +16,15 @@
       border-bottom: 1px solid #ccc;
       text-align: left;
     }
-    /* let these two columns expand to fit content */
     col.driver-col,
     col.funcao-col {
-      /* no fixed width: auto will size to content */
       width: auto;
     }
     td.driver-col,
     td.funcao-col {
-      white-space: nowrap;        /* prevent wrapping */
-      overflow-x: auto;           /* allow horizontal scroll if really long */
+      white-space: nowrap;
+      overflow-x: auto;
     }
-    /* make form inputs stretch full width */
     form#printers-form input {
       width: 100%;
       box-sizing: border-box;
