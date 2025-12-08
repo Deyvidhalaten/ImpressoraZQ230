@@ -1,165 +1,232 @@
 import fnmatch
 from datetime import datetime
 import os
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, session
+from flask import (
+    Blueprint, render_template, request, redirect,
+    url_for, flash, current_app, session
+)
 
 from app.services.mapping_service import load_printer_map_from
 from app.services.product_service import consulta_Base
 from app.services.printing_service import enviar_para_impressora_ip
-from app.services.log_service import append_log
 from app.services.templates_service import list_templates_by_mode, render_zpl
+from app.services.log_service import append_log, log_audit, log_error
+from app.services.trace_service import start_trace, get_trace
 
 bp = Blueprint("main", __name__)
 
+
+# ------------------------------------------------------------
+# RENDER BÁSICO
+# ------------------------------------------------------------
+def _render_basic(DIRS):
+    return render_template(
+        "index.html",
+        printers=[], available=[], modo=None,
+        modos_disponiveis=[], modos_mapeados={},
+        templates_by_mode=list_templates_by_mode(DIRS["templates"])
+    )
+
+
+# ------------------------------------------------------------
+# RENDER COMPLETO
+# ------------------------------------------------------------
+def _render_full(DIRS, printers, available, modo, modos_disponiveis, modos_mapeados):
+    return render_template(
+        "index.html",
+        printers=printers,
+        available=available,
+        modo=modo,
+        modos_disponiveis=modos_disponiveis,
+        modos_mapeados=modos_mapeados,
+        templates_by_mode=list_templates_by_mode(DIRS["templates"])
+    )
+
+
+# ------------------------------------------------------------
+# DESCOBRE MODOS POSSÍVEIS
+# ------------------------------------------------------------
+def _descobrir_modos(DIRS, printers):
+    templates_dir = DIRS["templates"]
+
+    valid_modes = {
+        os.path.splitext(f)[0].split("_")[0].lower()
+        for f in os.listdir(templates_dir)
+        if f.endswith(".zpl.j2")
+    }
+
+    modos_mapeados = {}
+    for p in printers:
+        for m in p.get("funcao", []):
+            chave = m.lower().strip()
+            if chave in valid_modes:
+                modos_mapeados[chave] = " ".join(x.capitalize() for x in chave.split("_"))
+
+    modos_disponiveis = [
+        (k, modos_mapeados[k]) for k in sorted(modos_mapeados.keys())
+    ]
+
+    return modos_disponiveis, modos_mapeados
+
+
+# ------------------------------------------------------------
+# ROTA PRINCIPAL
+# ------------------------------------------------------------
 @bp.route("/", methods=["GET", "POST"])
 def index():
+
     DIRS = current_app.config["DIRS"]
     data_dir = DIRS["data"]
-    templates_dir = DIRS["templates"]
 
     mappings = load_printer_map_from(data_dir)
     client_ip = request.remote_addr
 
-    # 🔹 Identifica a loja com base no IP
+    # --------------- Identificação da Loja ---------------
     loja_map = next((p for p in mappings if fnmatch.fnmatch(client_ip, p["pattern"])), None)
     if not loja_map:
         flash("❌ Loja não cadastrada — contate o administrador.", "error")
-        return render_template(
-            "index.html",
-            printers=[], available=[], modo=None,
-            modos_disponiveis=[],
-            templates_by_mode=list_templates_by_mode(DIRS["templates"])
-        )
+        return _render_basic(DIRS)
 
-    # 🔹 Filtra impressoras da loja atual
-    printers = [p for p in mappings if p['loja'] == loja_map['loja']]
-
+    printers = [p for p in mappings if p["loja"] == loja_map["loja"]]
     if not printers:
-        flash("❌ Nenhuma impressora encontrada para esta loja.", "error")
-        return render_template(
-            "index.html",
-            printers=[], available=[], modo=None,
-            modos_disponiveis=[],
-            templates_by_mode=list_templates_by_mode(DIRS["templates"])
-        )
-    
-    # --- Obtém todos os modos válidos a partir dos templates ---
-    templates_dir = DIRS["templates"]
+        flash("❌ Nenhuma impressora configurada para esta loja.", "error")
+        return _render_basic(DIRS)
 
-    # --- Modos válidos encontrados nos templates ---
-    valid_modes = {
-           os.path.splitext(f)[0].split("_")[0].lower()
-           for f in os.listdir(templates_dir)
-           if f.endswith(".zpl.j2")
-           }
+    modos_disponiveis, modos_mapeados = _descobrir_modos(DIRS, printers)
 
-    # --- Mapeia modos válidos (interno → exibido) ---
-    modos_mapeados = {}
-    for p in printers:
-        for m in p.get('funcao', []):
-            chave = m.strip().lower()
-            if chave in valid_modes:
-                valor_exibicao = ' '.join(part.capitalize() for part in chave.split('_'))
-                modos_mapeados[chave] = valor_exibicao
-
-    # --- Lista modos para exibição na tela ---
-    modos_disponiveis = [
-        (chave, modos_mapeados[chave])
-        for chave in sorted(modos_mapeados.keys())]
-
-    # 🔹 Determina o modo atual (POST → último da sessão → primeiro disponível)
     modo = (
         request.form.get("modo")
         or session.get("ultimo_modo")
-        or (modos_disponiveis[0] if modos_disponiveis else None)
+        or (modos_disponiveis[0][0] if modos_disponiveis else None)
     )
-
-    # 🔹 Filtra impressoras compatíveis com o modo selecionado
-    available = [p for p in printers if modo in p['funcao']]
-
-    # 🔹 Salva o modo atual na sessão
     session["ultimo_modo"] = modo
 
-    # Renderização padrão
-    def _render():
-        return render_template(
-            "index.html",
-            printers=printers,
-            available=available,
-            modo=modo,
-            modos_disponiveis=modos_disponiveis,
-            modos_mapeados=modos_mapeados,  # novo
-            templates_by_mode=list_templates_by_mode(DIRS["templates"])
-        )
+    available = [p for p in printers if modo in p["funcao"]]
 
-    # Lógica de POST (ações)
-    if request.method == "POST":
-        action = request.form.get("action", "print")
-        sel_ip = request.form.get("printer_ip")
+    # ------------------------------------------------------------
+    # GET → Tela normal
+    # ------------------------------------------------------------
+    if request.method == "GET":
+        return _render_full(DIRS, printers, available, modo, modos_disponiveis, modos_mapeados)
 
-        if sel_ip and any(p['ip'] == sel_ip for p in available):
-            printer_ip = sel_ip
-        elif available:
-            printer_ip = available[0]['ip']
-        else:
-            flash(f"❌ Nenhuma impressora disponível para o modo {modo}", "error")
-            return _render()
+    # ------------------------------------------------------------
+    # POST → Inicia Trace
+    # ------------------------------------------------------------
+    trace = start_trace("impressao")
+    trace.add("inicio", ip=client_ip, modo=modo)
 
-        # 🔸 Carga (comando manual)
-        if action == "load":
-            ls = loja_map.get('ls_flor') if modo == "floricultura" else loja_map.get('ls_flv')
-            zpl = f"^XA\n^MD30\n^LS{ls}\n^XZ"
-            sucesso = enviar_para_impressora_ip(zpl, printer_ip)
-            flash(
-                f"{'✅' if sucesso else '❌'} Carga {modo} {'enviada' if sucesso else 'falhou'} em {printer_ip}",
-                "success" if sucesso else "error"
-            )
-            return _render()
+    action = request.form.get("action", "print")
+    sel_ip = request.form.get("printer_ip")
 
-        # 🔸 Impressão normal
-        try:
-            copies = max(1, min(int(request.form.get("copies", "1")), 100))
-        except ValueError:
-            copies = 1
+    # Escolha da impressora
+    if sel_ip and any(p["ip"] == sel_ip for p in available):
+        printer_ip = sel_ip
+    elif available:
+        printer_ip = available[0]["ip"]
+    else:
+        trace.add("nenhuma_impressora_compativel")
+        dados = trace.finish("falha")
+        log_audit("impressao_falha", trace=dados)
 
-        codigo_raw = request.form.get("codigo", "").strip()
-        DB = current_app.config["DB"]
-        DB_FLV = current_app.config["DB_FLV"]
-        db = DB_FLV if modo.lower() == "flv" else DB
+        flash(f"❌ Nenhuma impressora disponível para {modo}", "error")
+        return _render_full(DIRS, printers, available, modo, modos_disponiveis, modos_mapeados)
 
-        rec = consulta_Base(codigo_raw, db)
-        if not rec:
-            flash("❌ Produto não encontrado", "error")
-            return _render()
-        
-        norma_descricao = rec['descricao']
-        #Limita a quantidade de caracteres em 27 a descrição
-        norma_descricao = norma_descricao[:27]
-        tpl = f"{modo.lower()}_default.zpl.j2"
-        ctx = {
-            "modo":     modo,
-            "texto":    norma_descricao,
-            "codprod":  rec['codprod'],
-            "ean":      rec['ean'],
-            "copies":   copies,
-            "ls":       loja_map.get('ls_flor') if modo == "Floricultura" else loja_map.get('ls_flv'),
-            "data":     datetime.now().strftime('%d/%m/%Y'),
-            "validade": rec.get('validade'),
-            "infnutri": rec.get('info_nutri', []),
-        }
+    # ------------------------------------------------------------
+    # AÇÃO LOAD
+    # ------------------------------------------------------------
+    if action == "load":
+        modo_lower = modo.lower()
+        ls = loja_map["ls_flor"] if modo_lower == "floricultura" else loja_map["ls_flv"]
 
-        ZPL_ENV = current_app.config["ZPL_ENV"]
-        zpl = render_zpl(ZPL_ENV, tpl, **ctx)
+        trace.add("load_cmd", ip=printer_ip, ls=ls)
 
+        zpl = f"^XA\n^MD30\n^LS{ls}\n^XZ"
         sucesso = enviar_para_impressora_ip(zpl, printer_ip)
-        if sucesso:
-            append_log("print", client_ip, printer_ip,
-                       f"ean={rec['ean']},codprod={rec['codprod']},copies={copies},modo={modo}")
-            flash(f"✅ {copies} etiqueta(s) para {printer_ip}", "success")
-        else:
-            flash(f"❌ Falha de comunicação com {printer_ip}", "error")
 
-        return redirect(url_for("main.index"))
+        dados = trace.finish("sucesso" if sucesso else "falha")
+        log_audit("load", trace=dados)
 
-    # 🔸 GET padrão
-    return _render()
+        flash("Comando enviado" if sucesso else "Falha no envio", "success" if sucesso else "error")
+        return _render_full(DIRS, printers, available, modo, modos_disponiveis, modos_mapeados)
+
+    # ------------------------------------------------------------
+    # IMPRESSÃO NORMAL
+    # ------------------------------------------------------------
+    try:
+        copies = max(1, min(int(request.form.get("copies", "1")), 100))
+    except:
+        copies = 1
+
+    codigo_raw = request.form.get("codigo", "").strip()
+    db = current_app.config["DB_FLV"] if modo.lower() == "flv" else current_app.config["DB"]
+
+    trace.add("consulta_db", codigo=codigo_raw)
+
+    try:
+        rec = consulta_Base(codigo_raw, db)
+        trace.add("consulta_db_result", found=bool(rec))
+    except Exception as e:
+        trace.add("consulta_db_erro", erro=str(e))
+        log_error("Erro DB", erro=str(e))
+        dados = trace.finish("erro")
+        log_audit("impressao_falha", trace=dados)
+        raise
+
+    if not rec:
+        trace.add("produto_nao_encontrado", codigo=codigo_raw)
+        dados = trace.finish("falha")
+        log_audit("impressao_falha", trace=dados)
+        flash("❌ Produto não encontrado", "error")
+        return _render_full(DIRS, printers, available, modo, modos_disponiveis, modos_mapeados)
+
+    # ------------------------------------------------------------
+    # RENDER ZPL
+    # ------------------------------------------------------------
+    tpl = f"{modo.lower()}_default.zpl.j2"
+    ctx = {
+        "modo": modo,
+        "texto": rec["descricao"][:27],
+        "codprod": rec["codprod"],
+        "ean": rec["ean"],
+        "copies": copies,
+        "ls": loja_map["ls_flor"] if modo.lower() == "floricultura" else loja_map["ls_flv"],
+        "data": datetime.now().strftime("%d/%m/%Y"),
+        "validade": rec.get("validade"),
+        "infnutri": rec.get("info_nutri", []),
+    }
+
+    trace.add("render_zpl_start", template=tpl)
+
+    try:
+        zpl = render_zpl(current_app.config["ZPL_ENV"], tpl, **ctx)
+        trace.add("render_zpl_success", length=len(zpl))
+    except Exception as e:
+        trace.add("render_zpl_erro", erro=str(e))
+        log_error("Erro render ZPL", erro=str(e))
+        dados = trace.finish("erro")
+        log_audit("impressao_falha", trace=dados)
+        raise
+
+    # ENVIO À IMPRESSORA
+    trace.add("send_to_printer", ip=printer_ip)
+    sucesso = enviar_para_impressora_ip(zpl, printer_ip)
+
+    if sucesso:
+        trace.add("print_success", copies=copies)
+    if not sucesso:
+        trace.add("print_failed", ip=printer_ip)
+
+    #Finaliza trace
+    dados = trace.finish("sucesso" if sucesso else "falha")
+
+    #Auditoria
+    log_audit("impressao" if sucesso else "impressao_falha", trace=dados)
+
+    #Feedback do usuario
+    flash(
+        f"✅ {copies} etiqueta(s) enviadas para {printer_ip}"
+        if sucesso else f"❌ Falha ao enviar para {printer_ip}",
+        "success" if sucesso else "error"
+    )
+
+    return redirect(url_for("main.index"))

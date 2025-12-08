@@ -3,8 +3,9 @@ from flask import Flask
 from PIL import ImageFont
 
 from app.constants import BASE_DIR, SECRET_KEY, PERMANENT_SESSION_LIFETIME
-from app.bootstrap import init_data_layout, setup_logging
-from app.services.log_service import append_log
+from app.bootstrap import init_data_layout
+from app.services.logging_setup import setup_logging
+from app.services.log_service import append_log, init_loggers
 from app.services.product_service import load_db_flor_from, load_db_flv_from
 from app.services.mapping_service import load_printer_map_from
 from app.routes.main import bp as main_bp
@@ -22,6 +23,7 @@ if getattr(sys, "frozen", False):
     TEMPLATE_DIR = os.path.join(EXE_DIR, "app", "templates")
     STATIC_DIR   = os.path.join(EXE_DIR, "app", "static")
     REPO_BASE    = os.path.join(EXE_DIR, "app")  # onde ficam zpl_templates/seeds no build
+    
 else:
     # Dev
     TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
@@ -30,7 +32,14 @@ else:
 
 # --- ProgramData + semeadura de seeds/templates ---
 DIRS = init_data_layout(REPO_BASE)
-setup_logging(DIRS["logs"])  # logger -> ProgramData\logs\app.log
+loggers = setup_logging(DIRS["logs"])
+init_loggers(
+    service=loggers["service"],
+    audit=loggers["audit"],
+    error=loggers["error"],
+    csv_file=DIRS["logs"] / "logs.csv",
+    audit_jsonl=DIRS["logs"] / "audit.jsonl"
+)
 
 # --- Flask app ---
 app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR)
@@ -67,7 +76,7 @@ app.register_blueprint(admin_bp)
 @app.errorhandler(500)
 def _err500(e):
     app.logger.exception("Erro 500 na requisição")
-    return "Erro interno. Consulte o log em ProgramData\\BistekPrinter\\logs\\app.log", 500
+    return "Erro interno. Consulte com o suporte ou TI de loja", 500
 
 if __name__ == "__main__":
     append_log("startup")
