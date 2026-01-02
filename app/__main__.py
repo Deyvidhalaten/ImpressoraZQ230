@@ -4,10 +4,10 @@ from PIL import ImageFont
 
 from app.constants import BASE_DIR, SECRET_KEY, PERMANENT_SESSION_LIFETIME
 from app.bootstrap import init_data_layout
-from app.services.logging_setup import setup_logging
-from app.services.log_service import append_log, init_loggers
-from app.services.product_service import load_db_flor_from, load_db_flv_from
-from app.services.mapping_service import load_printer_map_from
+from app.old_services.logging_setup import setup_logging
+from app.old_services.log_service import append_log, init_loggers
+from app.old_services.product_service import load_db_flor_from, load_db_flv_from
+from app.old_services.mapping_service import load_printer_map_from
 from app.routes.main import bp as main_bp
 from app.routes.admin import bp as admin_bp
 from jinja2 import Environment, FileSystemLoader

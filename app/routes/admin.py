@@ -1,8 +1,8 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
 import os, csv
 from app.constants import USUARIO, SENHA, SHUTDOWN_PASSWORD, LOG_FILE, DEFAULT_LS_FLOR, DEFAULT_LS_FLV
-from app.services.mapping_service import load_printer_map_from, save_printer_map_to
-from app.services.log_service import append_log
+from app.old_services.mapping_service import load_printer_map_from, save_printer_map_to
+from app.old_services.log_service import append_log
 
 bp = Blueprint("admin", __name__)
 

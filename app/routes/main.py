@@ -6,12 +6,12 @@ from flask import (
     url_for, flash, current_app, session
 )
 
-from app.services.mapping_service import load_printer_map_from
-from app.services.product_service import consulta_Base
-from app.services.printing_service import enviar_para_impressora_ip
-from app.services.templates_service import list_templates_by_mode, render_zpl
-from app.services.log_service import append_log, log_audit, log_error
-from app.services.trace_service import start_trace, get_trace
+from app.old_services.mapping_service import load_printer_map_from
+from app.old_services.product_service import consulta_Base
+from app.old_services.printing_service import enviar_para_impressora_ip
+from app.old_services.templates_service import list_templates_by_mode, render_zpl
+from app.old_services.log_service import append_log, log_audit, log_error
+from app.old_services.trace_service import start_trace, get_trace
 
 bp = Blueprint("main", __name__)
 

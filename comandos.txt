@@ -19,10 +19,12 @@ waitress-serve --listen=10.17.30.2:8000 app:app          #Rodar Servidor em LAN
 
 python app.py  # Roda Localmente, mas precisa das dependencias acima
 
-Salvar Certificado caso de erro SLL 
-setx PIP_CERT "C:\certs\corp-root.pem"
-setx REQUESTS_CA_BUNDLE "C:\certs\corp-root.pem"
-setx SSL_CERT_FILE "C:\certs\corp-root.pem"
+Download de Certificado caso de erro SLL durante download de dependencias
+acesse https://pypi.org/ --> Pegue o certificado --> exporte no C:\certs
+Inclua o texto a baixo nas varaiveis de ambiente
+PIP_CERT "C:\certs\corp-root.pem"
+REQUESTS_CA_BUNDLE "C:\certs\corp-root.pem"
+SSL_CERT_FILE "C:\certs\corp-root.pem"
 
 Instalar Dependencia -> pip install pyinstaller
 Executar no CMD para gerar um executavel Criptografado ->  pyinstaller ImpressoraApp.spec
