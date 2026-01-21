@@ -1,8 +1,8 @@
 import os, shutil
 from pathlib import Path
 
-def get_programdata_root() -> Path:
-    base = os.environ.get("PROGRAMDATA") or ("/var/lib" if os.name != "nt" else r"C:\ProgramData")
+def get_appdata_root() -> Path:
+    base = os.environ.get("LOCALAPPDATA") or Path.home()
     return Path(base) / "BistekPrinter"
 
 def _copy_if_missing(src: Path, dst: Path):
@@ -11,7 +11,7 @@ def _copy_if_missing(src: Path, dst: Path):
         shutil.copy2(src, dst)
 
 def init_data_layout(repo_base_dir: str) -> dict:
-    root = get_programdata_root()
+    root = get_appdata_root()
     dirs = {
         "root": root,
         "config": root / "config",
