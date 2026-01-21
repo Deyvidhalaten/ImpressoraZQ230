@@ -18,6 +18,7 @@ includefiles = [
     ("app/zpl_templates", "app/zpl_templates"),
     ("app/seeds", "app/seeds"),
     ("app/printer_zq230.py", "app/printer_zq230.py"),
+    ("app/routes", "app/routes"),
 ]
 
 # --- Inclui DLLs do PyWin32 ---
