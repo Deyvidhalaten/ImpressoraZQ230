@@ -4,55 +4,84 @@ import glob
 import ssl
 from cx_Freeze import setup, Executable
 
-# --- Corrige problemas de SSL em ambientes sem certificado ---
+# -------------------------------------------------------------------
+# (apenas para build / download de dependências)
+# -------------------------------------------------------------------
 ssl._create_default_https_context = ssl._create_unverified_context
 
-# --- Localiza DLLs do PyWin32 (para win32print, win32ui, etc.) ---
-pywin32_system32 = os.path.join(sys.base_prefix, "Lib", "site-packages", "pywin32_system32")
-win32_dlls = glob.glob(os.path.join(pywin32_system32, "*.dll")) if os.path.isdir(pywin32_system32) else []
+# -------------------------------------------------------------------
+# Localiza DLLs do PyWin32 (OBRIGATÓRIO para impressão no Windows)
+# -------------------------------------------------------------------
+pywin32_system32 = os.path.join(
+    sys.base_prefix,
+    "Lib",
+    "site-packages",
+    "pywin32_system32"
+)
 
-# --- Arquivos adicionais a incluir no build ---
+win32_dlls = []
+if os.path.isdir(pywin32_system32):
+    win32_dlls = glob.glob(os.path.join(pywin32_system32, "*.dll"))
+
+# -------------------------------------------------------------------
+# Arquivos adicionais do projeto
+# -------------------------------------------------------------------
 includefiles = [
     ("app/static", "app/static"),
     ("app/templates", "app/templates"),
     ("app/zpl_templates", "app/zpl_templates"),
     ("app/seeds", "app/seeds"),
-    ("app/printer_zq230.py", "app/printer_zq230.py"),
     ("app/routes", "app/routes"),
+    ("app/services", "app/services"),
+    ("app/printer_zq230.py", "app/printer_zq230.py"),
 ]
 
-# --- Inclui DLLs do PyWin32 ---
+# DLLs do pywin32
 includefiles += [(dll, os.path.basename(dll)) for dll in win32_dlls]
 
-# --- Configurações do build ---
+# -------------------------------------------------------------------
+# Configurações do cx_Freeze
+# -------------------------------------------------------------------
 build_exe_options = {
     "packages": [
         "app",
-        "app.routes",
-        "app.services",
         "flask",
         "jinja2",
         "urllib3",
         "PIL",
         "win32print",
         "win32ui",
-        "win32con",
         "win32com",
         "pythoncom",
     ],
     "includes": [
-        "app.printer_zq230",
-        "app.__main__",
+        "http",
+        "http.client",
+        "socket",
+        "select",
+        "queue",
+        "win32con",
+        "win32timezone",
     ],
     "include_files": includefiles,
-    "include_msvcr": True,  # Inclui runtime do Visual C++
-    "excludes": ["tkinter"],  # reduz tamanho final
+    "include_msvcr": True,
+    "excludes": [
+        "tkinter",
+        "unittest",
+        "email",
+        "http",
+        "xml",
+    ],
 }
 
-# --- Define o modo GUI (sem console) ---
+# -------------------------------------------------------------------
+# Define modo GUI (sem console)
+# -------------------------------------------------------------------
 base = "Win32GUI" if sys.platform == "win32" else None
 
-# --- Cria executável ---
+# -------------------------------------------------------------------
+# Criação do executável
+# -------------------------------------------------------------------
 setup(
     name="BistekPrinter",
     version="2.0.0",
@@ -63,7 +92,7 @@ setup(
             script="app/__main__.py",
             base=base,
             target_name="BistekPrinter.exe",
-            icon=None,  # opcional: caminho para ícone .ico
+            icon=None,  # opcional: caminho para .ico
         )
     ],
 )
