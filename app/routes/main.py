@@ -192,7 +192,7 @@ def index():
         "ls": loja_map["ls_flor"] if modo.lower() == "floricultura" else loja_map["ls_flv"],
         "data": datetime.now().strftime("%d/%m/%Y"),
         "validade": rec.get("validade"),
-        "infnutri": rec.get("info_nutri", []),
+        "nutri": rec.get("nutri"),
     }
 
     trace.add("render_zpl_start", template=tpl)

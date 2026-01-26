@@ -11,6 +11,7 @@ from app.services.mapping_service import load_printer_map_from
 from app.routes.main import bp as main_bp
 from app.routes.admin import bp as admin_bp
 from jinja2 import Environment, FileSystemLoader
+from app.services.templates_service import criar_ambiente_zpl
 
 # SSL / Warnings
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -51,12 +52,7 @@ app.config["DIRS"]   = DIRS
 app.config["DB"]     = load_db_flor_from(DIRS["data"])
 app.config["DB_FLV"] = load_db_flv_from(DIRS["data"])
 zpl_templates_dir = DIRS["templates"]  # ProgramData\BistekPrinter\zpl_templates
-app.config["ZPL_ENV"] = Environment(
-    loader=FileSystemLoader(zpl_templates_dir),
-    autoescape=False,  # desativa escape (ZPL é puro texto)
-    trim_blocks=True,
-    lstrip_blocks=True
-)
+app.config["ZPL_ENV"] = criar_ambiente_zpl(zpl_templates_dir)
 
 # Fonte (fallback)
 windows_font = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts", "arial.ttf")
