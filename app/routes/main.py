@@ -182,12 +182,24 @@ def index():
     # ------------------------------------------------------------
     # RENDER ZPL
     # ------------------------------------------------------------
+    ean13=rec.get("ean")
+    def contar_caracteres(texto):
+        return len(str(texto))
+    ean13Normaliza = ean13
+    if contar_caracteres(ean13)<13:
+        tipoean="B2"
+        if len(ean13) < 12:
+            ean13Normaliza = ean13.zfill(12)
+    else:
+        tipoean="BE"
+    
     tpl = f"{modo.lower()}_default.zpl.j2"
     ctx = {
+        "tipoean":tipoean,
         "modo": modo,
         "texto": rec["descricao"][:27],
         "codprod": rec["codprod"],
-        "ean": rec["ean"],
+        "ean": ean13Normaliza,
         "copies": copies,
         "ls": loja_map["ls_flor"] if modo.lower() == "floricultura" else loja_map["ls_flv"],
         "data": datetime.now().strftime("%d/%m/%Y"),
