@@ -23,6 +23,11 @@ def init_data_layout(repo_base_dir: str) -> dict:
     for p in dirs.values():
         p.mkdir(parents=True, exist_ok=True)
 
+    # Settings padrão (modo teste desligado)
+    settings_file = dirs["config"] / "settings.txt"
+    if not settings_file.exists():
+        settings_file.write_text("impressora_teste=0\n", encoding="utf-8")
+
     # Templates
     repo_tpl = Path(repo_base_dir) / "zpl_templates"
     if not any(dirs["templates"].glob("*.zpl.j2")) and repo_tpl.is_dir():
@@ -45,3 +50,4 @@ def init_data_layout(repo_base_dir: str) -> dict:
                 _copy_if_missing(legacy_path, dst)
 
     return dirs
+

@@ -49,3 +49,27 @@ def consulta_Base(codigo: str, db: dict) -> Optional[dict]:
         rec = db.get(f)
         if rec: return rec
     return None
+
+
+def busca_por_descricao(termo: str, db: dict, limite: int = 10) -> list:
+    """Busca produtos cuja descrição contenha o termo."""
+    if not termo or len(termo) < 2:
+        return []
+    
+    termo_lower = termo.lower()
+    resultados = []
+    vistos = set()
+    
+    for key, rec in db.items():
+        codprod = rec.get('codprod', '')
+        if codprod in vistos:
+            continue
+        
+        descricao = rec.get('descricao', '').lower()
+        if termo_lower in descricao:
+            resultados.append(rec)
+            vistos.add(codprod)
+            if len(resultados) >= limite:
+                break
+    
+    return resultados

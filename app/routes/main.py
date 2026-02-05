@@ -10,7 +10,7 @@ from app.services.mapping_service import load_printer_map_from
 from app.services.product_service import consulta_Base
 from app.services.printing_service import enviar_para_impressora_ip
 from app.services.templates_service import list_templates_by_mode, render_zpl
-from app.services.log_service import append_log, log_audit, log_error
+from app.services.log_service import log_audit, log_error
 from app.services.trace_service import start_trace, get_trace
 
 bp = Blueprint("main", __name__)
@@ -141,7 +141,7 @@ def index():
         trace.add("load_cmd", ip=printer_ip, ls=ls)
 
         zpl = f"^XA\n^MD30\n^LS{ls}\n^XZ"
-        sucesso = enviar_para_impressora_ip(zpl, printer_ip)
+        sucesso = enviar_para_impressora_ip(zpl, printer_ip, client_ip=request.remote_addr)
 
         dados = trace.finish("sucesso" if sucesso else "falha")
         log_audit("load", trace=dados)
@@ -209,7 +209,7 @@ def index():
 
     # ENVIO À IMPRESSORA
     trace.add("send_to_printer", ip=printer_ip)
-    sucesso = enviar_para_impressora_ip(zpl, printer_ip)
+    sucesso = enviar_para_impressora_ip(zpl, printer_ip, client_ip=request.remote_addr)
 
     if sucesso:
         trace.add("print_success", copies=copies)

@@ -1,15 +1,13 @@
 # app/services/log_service.py
 import json
-import csv, time, logging
+import logging
 from pathlib import Path
 from flask import has_request_context, request
 
 # Loggers configurados no bootstrap
-SERVICE_LOGGER: logging.Logger | None = None
 AUDIT_LOGGER:   logging.Logger | None = None
 ERROR_LOGGER:   logging.Logger | None = None
 
-LOG_CSV: Path | None = None  # para compatibilidade com /logs CSV, Descartar quando atualizar para Graficos
 AUDIT_JSONL: Path | None = None
 
 # ---------------------------------------------------------
@@ -29,21 +27,11 @@ def _with_request_context(data: dict) -> dict:
 # ---------------------------------------------------------
 # Inicialização feita no bootstrap
 # ---------------------------------------------------------
-def init_loggers(service, audit, error, csv_file: Path | None, audit_jsonl: Path | None):
-    global SERVICE_LOGGER, AUDIT_LOGGER, ERROR_LOGGER, LOG_CSV, AUDIT_JSONL
-    SERVICE_LOGGER = service
+def init_loggers(audit, error, audit_jsonl: Path | None):
+    global AUDIT_LOGGER, ERROR_LOGGER, AUDIT_JSONL
     AUDIT_LOGGER   = audit
     ERROR_LOGGER   = error
-    LOG_CSV        = csv_file
     AUDIT_JSONL    = audit_jsonl
-
-
-# ---------------------------------------------------------
-# Logs gerais do sistema (INFO)
-# ---------------------------------------------------------
-def log_service(message: str, **meta):
-    if SERVICE_LOGGER:
-        SERVICE_LOGGER.info(message, extra=_with_request_context(meta))
 
 
 # ---------------------------------------------------------
@@ -72,19 +60,3 @@ def log_exception(message: str, **meta):
     if ERROR_LOGGER:
         ERROR_LOGGER.exception(message, extra=_with_request_context(meta))
 
-
-def append_log(evento: str, ip: str = "", impressora: str = "", detalhes: str = ""):
-    if LOG_CSV is None:
-        return
-
-    LOG_CSV.parent.mkdir(parents=True, exist_ok=True)
-
-    exists = LOG_CSV.exists()
-    with LOG_CSV.open("a", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        if not exists:
-            w.writerow(["timestamp", "evento", "ip", "impressora", "detalhes"])
-        ts = time.strftime("%Y-%m-%d %H:%M:%S")
-        w.writerow([ts, evento, ip, impressora, detalhes])
-
-    log_service("csv_log/" + evento, ip=ip, impressora=impressora, detalhes=detalhes)

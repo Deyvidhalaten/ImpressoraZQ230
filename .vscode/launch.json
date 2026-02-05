@@ -5,13 +5,15 @@
       "name": "Run App (module: app)",
       "type": "debugpy",
       "request": "launch",
-      "module": "app",                    // roda app/__main__.py como pacote
-      "cwd": "${workspaceFolder}",        // raiz do repo
+      "module": "app",
+      "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "justMyCode": false,
       "env": {
-        "FLASK_ENV": "development"
-      }
+        "FLASK_ENV": "development",
+        "PYTHONUNBUFFERED": "1"
+      },
+      "args": []
     }
   ]
 }

@@ -5,11 +5,12 @@ from PIL import ImageFont
 from app.constants import BASE_DIR, SECRET_KEY, PERMANENT_SESSION_LIFETIME
 from app.bootstrap import init_data_layout
 from app.services.logging_setup import setup_logging
-from app.services.log_service import append_log, init_loggers
+from app.services.log_service import init_loggers
 from app.services.product_service import load_db_flor_from, load_db_flv_from
 from app.services.mapping_service import load_printer_map_from
 from app.routes.main import bp as main_bp
 from app.routes.admin import bp as admin_bp
+from app.routes.api import bp as api_bp
 from jinja2 import Environment, FileSystemLoader
 
 # SSL / Warnings
@@ -34,10 +35,8 @@ else:
 DIRS = init_data_layout(REPO_BASE)
 loggers = setup_logging(DIRS["logs"])
 init_loggers(
-    service=loggers["service"],
     audit=loggers["audit"],
     error=loggers["error"],
-    csv_file=DIRS["logs"] / "logs.csv",
     audit_jsonl=DIRS["logs"] / "audit.jsonl"
 )
 
@@ -71,6 +70,20 @@ _ = load_printer_map_from(DIRS["data"])
 # Blueprints
 app.register_blueprint(main_bp)
 app.register_blueprint(admin_bp)
+app.register_blueprint(api_bp)
+
+# Serve arquivos do novo frontend (pasta frontend/)
+from flask import send_from_directory
+
+FRONTEND_DIR = os.path.join(os.path.dirname(BASE_DIR), "frontend")
+
+@app.route("/frontend/<path:filename>")
+def serve_frontend(filename):
+    return send_from_directory(FRONTEND_DIR, filename)
+
+@app.route("/frontend/")
+def serve_frontend_index():
+    return send_from_directory(FRONTEND_DIR, "index.html")
 
 # Handler simples pra logar 500 com stack
 @app.errorhandler(500)
@@ -78,9 +91,17 @@ def _err500(e):
     app.logger.exception("Erro 500 na requisição")
     return "Erro interno. Consulte com o suporte ou TI de loja", 500
 
-if __name__ == "__main__":
-    append_log("startup")
-    try:
-        app.run(host="0.0.0.0", port=8000, debug=False, use_reloader=False)
-    finally:
-        append_log("admin.shutdown")
+if __name__ == "__main__" or __name__ == "app.__main__":
+    # Detecta se está em modo desenvolvimento (via variável de ambiente ou VS Code debug)
+    import sys
+    is_dev = os.environ.get("FLASK_ENV") == "development" or hasattr(sys, 'gettrace') and sys.gettrace() is not None
+    
+    # Em desenvolvimento: threaded=False para breakpoints funcionarem no VS Code
+    # Em produção: threaded=True para melhor performance
+    app.run(
+        host="0.0.0.0", 
+        port=8000, 
+        debug=is_dev,
+        use_reloader=False,
+        threaded=not is_dev  # False em dev (debug funciona), True em prod (performance)
+    )

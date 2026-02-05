@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 import os, csv
 from app.constants import USUARIO, SENHA, SHUTDOWN_PASSWORD, LOG_FILE, DEFAULT_LS_FLOR, DEFAULT_LS_FLV
 from app.services.mapping_service import load_printer_map_from, save_printer_map_to
-from app.services.log_service import append_log
+from app.services.log_service import log_audit
 
 bp = Blueprint("admin", __name__)
 
@@ -43,9 +43,9 @@ def printers():
                 mappings = [m for m in mappings
                             if not (m.get("pattern")==pattern_to_delete and m.get("ip")==ip_to_delete)]
                 save_printer_map_to(data_dir, mappings)
-                append_log("mapping_delete", request.remote_addr,
-                           m_antigo.get("nome", m_antigo.get("ip","")),
-                           f"loja={m_antigo.get('loja')}, ip={ip_to_delete}")
+                log_audit("mapping_delete", ip=request.remote_addr,
+                           impressora=m_antigo.get("nome", m_antigo.get("ip","")),
+                           detalhes=f"loja={m_antigo.get('loja')}, ip={ip_to_delete}")
                 flash(f"🗑️ Impressora {ip_to_delete} excluída com sucesso!", "success")
             else:
                 flash("❌ Impressora não encontrada para exclusão.", "error")
@@ -84,8 +84,8 @@ def printers():
                     'ls_flv': ls_flv_val
                 })
                 updated = True
-                append_log(
-                    "mapping_update", request.remote_addr, detalhes=(
+                log_audit(
+                    "mapping_update", ip=request.remote_addr, detalhes=(
                         f"loja={loja}, old_ls_flor={m_antigo.get('ls_flor')}, new_ls_flor={ls_flor_val}, "
                         f"old_ls_flv={m_antigo.get('ls_flv')}, new_ls_flv={ls_flv_val}"
                     )
@@ -98,7 +98,7 @@ def printers():
                 'funcao': funcao_list, 'ls_flor': ls_flor_val, 'ls_flv': ls_flv_val
             })
 
-        append_log("mapping_add", request.remote_addr,
+        log_audit("mapping_add", ip=request.remote_addr,
                    detalhes=f"loja={loja}, ls_flor={ls_flor_val}, ls_flv={ls_flv_val}")
         save_printer_map_to(data_dir, mappings)
         flash("✅ Mapeamento salvo com sucesso!", "success")

@@ -55,31 +55,27 @@ def _make_handler(path: Path) -> TimedRotatingFileHandler:
 
 def setup_logging(logs_dir: Path) -> dict:
     """
-    Cria 3 loggers:
-      - app.service → requests, prints, startup/shutdown
-      - app.audit   → mudanças em printers.csv, ajustes de LS
-      - app.error   → exceções (além de também duplicar no service se quiser)
+    Cria 2 loggers:
+      - app.audit   → mudanças em printers.csv, ajustes de LS, impressões
+      - app.error   → exceções e erros
     Retorna os loggers em um dict para uso eventual.
     """
     logs_dir = Path(logs_dir)
-    service_path = logs_dir / "service.log"
     audit_path   = logs_dir / "audit.log"
     error_path   = logs_dir / "error.log"
 
     # Evita duplicar handlers se setup_logging for chamado 2x
-    for name in ("app.service", "app.audit", "app.error"):
+    for name in ("app.audit", "app.error"):
         logger = logging.getLogger(name)
         logger.handlers.clear()
         logger.propagate = False
         logger.setLevel(logging.INFO)
 
     # Handlers
-    service_h = _make_handler(service_path)
     audit_h   = _make_handler(audit_path)
     error_h   = _make_handler(error_path)
 
     # Loggers
-    service_logger = logging.getLogger("app.service"); service_logger.addHandler(service_h)
     audit_logger   = logging.getLogger("app.audit");   audit_logger.addHandler(audit_h)
     error_logger   = logging.getLogger("app.error");   error_logger.addHandler(error_h)
     error_logger.setLevel(logging.WARNING)  # erros/alertas
@@ -88,12 +84,11 @@ def setup_logging(logs_dir: Path) -> dict:
     if ENVIRONMENT != "prd":
         console = logging.StreamHandler()
         console.setFormatter(JsonFormatter())
-        service_logger.addHandler(console)
         audit_logger.addHandler(console)
         error_logger.addHandler(console)
 
     return {
-        "service": service_logger,
         "audit":   audit_logger,
         "error":   error_logger,
     }
+
