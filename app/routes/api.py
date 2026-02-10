@@ -114,6 +114,12 @@ def search_products():
     query = request.args.get("q", "").strip()
     search_type = request.args.get("type", "codigo")  # codigo ou descricao
     modo = request.args.get("modo", "flv").lower()
+    
+    # Limite opcional, padrão 50 (aumentado de 10)
+    try:
+        limit = int(request.args.get("limit", 50))
+    except:
+        limit = 50
 
     if not query:
         return jsonify({"products": [], "error": "Query vazia"})
@@ -125,7 +131,7 @@ def search_products():
 
     if search_type == "descricao":
         # Busca por descrição - retorna lista
-        resultados = busca_por_descricao(query, db, limite=10)
+        resultados = busca_por_descricao(query, db, limite=limit)
         products = [
             {
                 "codprod": r["codprod"],
@@ -136,7 +142,7 @@ def search_products():
             for r in resultados
         ]
     else:
-        # Busca por código - retorna um item
+        # Busca por código - retorna um item (ou lista de 1)
         rec = consulta_Base(query, db)
         if rec:
             products = [{
@@ -229,6 +235,9 @@ def print_label():
 
     # Render ZPL
     tpl = f"{modo}_default.zpl.j2"
+    nutri_list = rec.get("info_nutri", [])
+    nutri_obj = nutri_list[0] if isinstance(nutri_list, list) and nutri_list else {}
+
     ctx = {
         "modo": modo,
         "texto": rec["descricao"][:27],
@@ -238,7 +247,8 @@ def print_label():
         "ls": loja_map["ls_flor"] if modo == "floricultura" else loja_map["ls_flv"],
         "data": datetime.now().strftime("%d/%m/%Y"),
         "validade": rec.get("validade"),
-        "infnutri": rec.get("info_nutri", []),
+        "infnutri": nutri_list,
+        "nutri": nutri_obj,
     }
 
     try:
@@ -392,13 +402,13 @@ def update_ls():
 
 @bp.route("/stats", methods=["GET", "OPTIONS"])
 def get_stats():
-    """Retorna estatísticas de impressão baseadas no audit.jsonl."""
+    """Retorna estatísticas de impressão baseadas no audit.jsonl corretamente parseado."""
     if request.method == "OPTIONS":
         return "", 204
 
     import json
     from datetime import datetime, timedelta
-    from pathlib import Path
+    from app.services.mapping_service import load_printer_map_from
 
     DIRS = current_app.config["DIRS"]
     audit_jsonl = DIRS["logs"] / "audit.jsonl"
@@ -412,29 +422,63 @@ def get_stats():
     por_dia = {}
     total = 0
     lojas_set = set()
+    
+    # Carrega mapeamento de lojas para identificar por IP
+    mappings = load_printer_map_from(DIRS["data"])
 
     if audit_jsonl.exists():
         with open(audit_jsonl, "r", encoding="utf-8") as f:
             for line in f:
                 try:
                     entry = json.loads(line.strip())
-                    # Filtra por evento de impressão
-                    if entry.get("evento") not in ("impressao", "print_success"):
+                    
+                    # O formato do log é {"trace_id": "...", "events": [...], ...}
+                    events = entry.get("events", [])
+                    if not isinstance(events, list):
                         continue
 
-                    # Parse timestamp
-                    ts_str = entry.get("timestamp", "")
-                    try:
-                        ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00").split("+")[0])
-                    except:
+                    # Verifica se houve sucesso de impressão
+                    print_success_event = next((e for e in events if e.get("event") == "print_success"), None)
+                    if not print_success_event:
                         continue
+                        
+                    # Verifica explicitamente se NÃO teve produto_nao_encontrado (redundante pois print_success implica que achou, mas pedido explícito)
+                    produto_nao_encontrado = next((e for e in events if e.get("event") == "produto_nao_encontrado"), None)
+                    if produto_nao_encontrado:
+                        continue
+
+                    # Extrai data do evento de sucesso ou do primeiro evento
+                    ts_str = print_success_event.get("t") or (events[0].get("t") if events else "")
+                    if not ts_str:
+                        continue
+
+                    try:
+                        # Formato esperado: "YYYY-MM-DD HH:MM:SS"
+                        ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
+                    except ValueError:
+                        try:
+                            ts = datetime.fromisoformat(ts_str)
+                        except:
+                            continue
 
                     if ts < cutoff:
                         continue
 
-                    # Extrai loja do trace ou dados
-                    trace = entry.get("trace", {})
-                    loja = trace.get("loja") or entry.get("loja") or "?"
+                    # Identifica loja pelo IP do evento 'inicio'
+                    inicio_event = next((e for e in events if e.get("event") == "inicio"), None)
+                    client_ip = inicio_event.get("ip") if inicio_event else None
+                    
+                    loja = "Desconhecida"
+                    if client_ip:
+                         # Tenta casar IP com loja usando fnmatch (mesma lógica do context)
+                        printer_match = next((p for p in mappings if fnmatch.fnmatch(client_ip, p["pattern"])), None)
+                        if printer_match:
+                            loja = printer_match["loja"]
+                        else:
+                            # Tenta extrair do IP se for 10.x.y.z -> x
+                            parts = client_ip.split(".")
+                            if len(parts) == 4 and parts[0] == "10":
+                                loja = parts[1]
 
                     lojas_set.add(loja)
 
@@ -442,7 +486,7 @@ def get_stats():
                         continue
 
                     # Atualiza contadores
-                    copies = trace.get("copies", 1) or 1
+                    copies = int(print_success_event.get("copies", 1))
                     total += copies
 
                     por_loja[loja] = por_loja.get(loja, 0) + copies
@@ -452,12 +496,15 @@ def get_stats():
 
                 except json.JSONDecodeError:
                     continue
+                except Exception as e:
+                    # Logar erro de parse silenciosamente ou printar em dev
+                    continue
 
     media_diaria = round(total / max(dias, 1), 1)
 
     return jsonify({
         "total": total,
-        "lojas": sorted(lojas_set),
+        "lojas": sorted(list(lojas_set)),
         "media_diaria": media_diaria,
         "por_loja": por_loja,
         "por_dia": por_dia,

@@ -390,7 +390,7 @@ function clearProductList() {
 // Event Handlers
 // ============================================
 function setupEventListeners() {
-    // Form submit
+    // Form submit (ou Enter no input, ou clique em Imprimir)
     elements.printForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
@@ -410,6 +410,25 @@ function setupEventListeners() {
             return;
         }
 
+        // Lógica de "Busca antes de Imprimir"
+        // Se não tem produto selecionado, ou se o código mudou -> BUSCAR
+        if (!state.selectedProduct || state.selectedProduct.codprod !== codigo) {
+            // Realiza busca
+            const result = await searchProducts(codigo, 'codigo');
+
+            if (result.products.length === 0) {
+                showToast('error', 'Não encontrado', 'Produto não encontrado');
+                clearSelectedProduct();
+            } else {
+                // Encontrou: Seleciona e exibe. NÃO imprime.
+                selectProduct(result.products[0]);
+                // Se foi pelo botão de Imprimir, avisa que agora pode imprimir
+                showToast('info', 'Produto Carregado', 'Confira os dados e clique em Imprimir para confirmar.');
+            }
+            return; // Interrompe fluxo de impressão
+        }
+
+        // Se chegou aqui, produto está selecionado e código confere -> IMPRIMIR
         if (!printerIp) {
             showToast('warning', 'Atenção', 'Nenhuma impressora disponível');
             return;
@@ -432,12 +451,15 @@ function setupEventListeners() {
             // Abre modal com resultados
             openModal(query);
         } else {
-            // Busca por código - imprime direto ou mostra erro
+            // Busca por código - exibe produto para confirmação (NÃO imprime direto)
             const result = await searchProducts(query, 'codigo');
             if (result.products.length === 0) {
                 showToast('error', 'Não encontrado', 'Produto não encontrado com este código');
+                clearSelectedProduct();
             } else {
+                // Seleciona e exibe o primeiro encontrado
                 selectProduct(result.products[0]);
+                showToast('success', 'Encontrado', 'Produto localizado. Verifique e clique em Imprimir.');
             }
         }
     });

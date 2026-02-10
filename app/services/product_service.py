@@ -51,12 +51,28 @@ def consulta_Base(codigo: str, db: dict) -> Optional[dict]:
     return None
 
 
-def busca_por_descricao(termo: str, db: dict, limite: int = 10) -> list:
-    """Busca produtos cuja descrição contenha o termo."""
+def busca_por_descricao(termo: str, db: dict, limite: int = 50) -> list:
+    """Busca produtos cuja descrição corresponda ao termo (suporta % como wildcard)."""
     if not termo or len(termo) < 2:
         return []
     
-    termo_lower = termo.lower()
+    # Escapa caracteres especiais de regex, exceto %
+    # Primeiro escapa tudo, depois desfaz o escape do % (que virou \%) para substituir por .*
+    import re
+    
+    # Abordagem simplificada:
+    # 1. split por %
+    # 2. escape de cada parte
+    # 3. join com .*
+    parts = termo.split('%')
+    parts = [re.escape(p) for p in parts]
+    pattern_str = '^' + '.*'.join(parts)
+    
+    try:
+        pattern = re.compile(pattern_str, re.IGNORECASE)
+    except re.error:
+        return []
+
     resultados = []
     vistos = set()
     
@@ -65,8 +81,8 @@ def busca_por_descricao(termo: str, db: dict, limite: int = 10) -> list:
         if codprod in vistos:
             continue
         
-        descricao = rec.get('descricao', '').lower()
-        if termo_lower in descricao:
+        descricao = rec.get('descricao', '')
+        if pattern.search(descricao):
             resultados.append(rec)
             vistos.add(codprod)
             if len(resultados) >= limite:
