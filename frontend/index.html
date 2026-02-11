@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BistekPrinter - Impressão de Etiquetas</title>
+    <meta name="description" content="Sistema de impressão de etiquetas Bistek Supermercados">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <img src="logo-bistek.png" alt="Bistek" class="logo-img">
+                </div>
+                <nav class="header-nav">
+                    <a href="admin.html" class="nav-link">⚙️ Admin</a>
+                    <a href="stats.html" class="nav-link">📊 Estatísticas</a>
+                </nav>
+                <div class="status-badge" id="statusBadge">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Conectando...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Info Cards -->
+            <section class="info-cards">
+                <div class="card info-card">
+                    <div class="card-icon">🏪</div>
+                    <div class="card-content">
+                        <span class="card-label">Loja</span>
+                        <span class="card-value" id="lojaName">--</span>
+                    </div>
+                </div>
+                <div class="card info-card">
+                    <div class="card-icon">🖨️</div>
+                    <div class="card-content">
+                        <span class="card-label">Impressora</span>
+                        <span class="card-value" id="printerName">--</span>
+                    </div>
+                </div>
+                <div class="card info-card" id="testModeCard" style="display: none;">
+                    <div class="card-icon">🧪</div>
+                    <div class="card-content">
+                        <span class="card-label">Modo</span>
+                        <span class="card-value" style="color: #e31e24;">TESTE</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Mode Selector -->
+            <section class="mode-section">
+                <h2 class="section-title">Tipo de Impressão</h2>
+                <div class="mode-tabs" id="modeTabs">
+                    <!-- Tabs serão inseridas via JS ou default -->
+                </div>
+            </section>
+
+            <!-- Print Form -->
+            <section class="print-section">
+                <div class="card print-card">
+                    <h2 class="section-title">Imprimir Etiqueta</h2>
+
+                    <form id="printForm" class="print-form">
+                        <!-- Toggle de Tipo de Busca -->
+                        <div class="search-type-container">
+                            <label class="form-label">Tipo de Busca</label>
+                            <div class="search-type-toggle">
+                                <button type="button" class="toggle-btn active" data-type="codigo" id="btnBuscaCodigo">
+                                    🔢 Código
+                                </button>
+                                <button type="button" class="toggle-btn" data-type="descricao" id="btnBuscaDescricao">
+                                    🔤 Descrição
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="codigoInput" class="form-label" id="labelBusca">Código do Produto</label>
+                            <div class="input-wrapper">
+                                <input type="text" id="codigoInput" class="form-input"
+                                    placeholder="Digite ou escaneie o código" autocomplete="off" autofocus>
+                                <button type="button" class="input-search-btn" id="btnSearch" title="Buscar">🔍</button>
+                            </div>
+                        </div>
+
+                        <!-- Produto selecionado (aparece após busca por descrição) -->
+                        <div class="selected-product" id="selectedProduct" style="display: none;">
+                            <div class="selected-product-info">
+                                <span class="selected-product-name" id="selectedProductName"></span>
+                                <span class="selected-product-code" id="selectedProductCode"></span>
+                            </div>
+                            <button type="button" class="btn-clear-product" id="btnClearProduct">✕</button>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="copiesInput" class="form-label">Quantidade</label>
+                                <div class="quantity-control">
+                                    <button type="button" class="qty-btn" id="qtyMinus">−</button>
+                                    <input type="number" id="copiesInput" class="form-input qty-input" value="1" min="1"
+                                        max="100">
+                                    <button type="button" class="qty-btn" id="qtyPlus">+</button>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="printerSelect" class="form-label">Impressora</label>
+                                <select id="printerSelect" class="form-select">
+                                    <!-- Options inseridas via JS -->
+                                </select>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-print" id="printBtn">
+                            <span class="btn-icon">🖨️</span>
+                            <span class="btn-text">Imprimir</span>
+                        </button>
+                    </form>
+                </div>
+            </section>
+        </main>
+
+        <!-- Modal de Busca de Produtos -->
+        <div class="modal-overlay" id="searchModal">
+            <div class="modal">
+                <div class="modal-header">
+                    <h3 class="modal-title">Selecionar Produto</h3>
+                    <button type="button" class="modal-close" id="modalClose">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="modal-search">
+                        <input type="text" id="modalSearchInput" class="form-input" placeholder="Digite para buscar...">
+                    </div>
+                    <div class="product-list" id="productList">
+                        <!-- Lista de produtos será inserida via JS -->
+                        <div class="product-loading" id="productLoading">
+                            <span>Buscando produtos...</span>
+                        </div>
+                        <div class="product-empty" id="productEmpty" style="display: none;">
+                            <span>Nenhum produto encontrado</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notifications -->
+        <div class="toast-container" id="toastContainer"></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

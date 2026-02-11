@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estatísticas - BistekPrinter</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="app-container">
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <img src="logo-bistek.jfif" alt="Bistek" class="logo-img">
+                </div>
+                <nav class="header-nav">
+                    <a href="index.html" class="nav-link">🏷️ Impressão</a>
+                    <a href="admin.html" class="nav-link">⚙️ Admin</a>
+                </nav>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <!-- Filtros -->
+            <section class="stats-filters">
+                <div class="card">
+                    <div class="filter-row">
+                        <div class="form-group">
+                            <label for="lojaFilter" class="form-label">Loja</label>
+                            <select id="lojaFilter" class="form-select">
+                                <option value="">Todas as Lojas</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="periodoFilter" class="form-label">Período</label>
+                            <select id="periodoFilter" class="form-select">
+                                <option value="7">Últimos 7 dias</option>
+                                <option value="30" selected>Últimos 30 dias</option>
+                                <option value="90">Últimos 90 dias</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" id="refreshStats">🔄 Atualizar</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Gráficos -->
+            <section class="stats-charts">
+                <div class="charts-grid">
+                    <!-- Consumo por Loja -->
+                    <div class="card chart-card">
+                        <h3 class="chart-title">📍 Consumo por Loja</h3>
+                        <div class="chart-container">
+                            <canvas id="lojaChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Consumo da Rede -->
+                    <div class="card chart-card">
+                        <h3 class="chart-title">🌐 Consumo da Rede (Total)</h3>
+                        <div class="chart-container">
+                            <canvas id="redeChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Resumo -->
+            <section class="stats-summary">
+                <div class="summary-cards">
+                    <div class="card summary-card">
+                        <div class="summary-icon">🏷️</div>
+                        <div class="summary-content">
+                            <span class="summary-value" id="totalEtiquetas">--</span>
+                            <span class="summary-label">Total de Etiquetas</span>
+                        </div>
+                    </div>
+                    <div class="card summary-card">
+                        <div class="summary-icon">🏪</div>
+                        <div class="summary-content">
+                            <span class="summary-value" id="totalLojas">--</span>
+                            <span class="summary-label">Lojas Ativas</span>
+                        </div>
+                    </div>
+                    <div class="card summary-card">
+                        <div class="summary-icon">📅</div>
+                        <div class="summary-content">
+                            <span class="summary-value" id="mediaDiaria">--</span>
+                            <span class="summary-label">Média Diária</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <div class="toast-container" id="toastContainer"></div>
+    </div>
+
+    <script src="stats.js"></script>
+</body>
+
+</html>
