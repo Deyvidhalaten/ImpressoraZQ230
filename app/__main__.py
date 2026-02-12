@@ -95,16 +95,19 @@ def _err500(e):
     return "Erro interno. Consulte com o suporte ou TI de loja", 500
 
 if __name__ == "__main__" or __name__ == "app.__main__":
-    # Detecta se está em modo desenvolvimento (via variável de ambiente ou VS Code debug)
-    import sys
-    is_dev = os.environ.get("FLASK_ENV") == "development" or hasattr(sys, 'gettrace') and sys.gettrace() is not None
-    
-    # Em desenvolvimento: threaded=False para breakpoints funcionarem no VS Code
-    # Em produção: threaded=True para melhor performance
-    app.run(
-        host="0.0.0.0", 
-        port=8000, 
-        debug=is_dev,
-        use_reloader=False,
-        threaded=not is_dev  # False em dev (debug funciona), True em prod (performance)
-    )
+    if os.environ.get("IMPORT_ONLY"):
+        pass
+    else:
+        # Detecta se está em modo desenvolvimento (via variável de ambiente ou VS Code debug)
+        import sys
+        is_dev = os.environ.get("FLASK_ENV") == "development" or hasattr(sys, 'gettrace') and sys.gettrace() is not None
+        
+        # Em desenvolvimento: threaded=False para breakpoints funcionarem no VS Code
+        # Em produção: threaded=True para melhor performance
+        app.run(
+            host="0.0.0.0", 
+            port=8000, 
+            debug=is_dev,
+            use_reloader=False,
+            threaded=not is_dev  # False em dev (debug funciona), True em prod (performance)
+        )

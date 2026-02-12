@@ -236,14 +236,29 @@ def print_label():
 
     # Render ZPL
     tpl = f"{modo}_default.zpl.j2"
-    nutri_list = rec.get("info_nutri", [])
-    nutri_obj = nutri_list[0] if isinstance(nutri_list, list) and nutri_list else {}
+    
+    # Ajuste: product_service retorna "nutri" como dict direto
+    nutri_obj = rec.get("nutri") or {} 
+    
+    # Mantemos compatibilidade caso algum template antigo use infnutri (lista)
+    nutri_list = [nutri_obj] if nutri_obj else []
+
+    # Lógica de EAN Dinâmico
+    ean_raw = str(rec.get("ean") or "")
+    ean_final = ean_raw
+    tipoean = "BE"  # Padrão EAN-13
+
+    if len(ean_raw) < 13:
+        tipoean = "B2"  # Interleaved 2 of 5
+        if len(ean_raw) < 12:
+            ean_final = ean_raw.zfill(12)
 
     ctx = {
+        "tipoean": tipoean,
         "modo": modo,
         "texto": rec["descricao"][:27],
         "codprod": rec["codprod"],
-        "ean": rec["ean"],
+        "ean": ean_final,
         "copies": copies,
         "ls": loja_map["ls_flor"] if modo == "floricultura" else loja_map["ls_flv"],
         "data": datetime.now().strftime("%d/%m/%Y"),
