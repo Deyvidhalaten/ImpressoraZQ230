@@ -55,6 +55,7 @@ def log_stats(loja: str, modo: str, copies: int):
     DATA;LOJA;MODO;QTD
     """
     if not STATS_CSV:
+        print("[DEBUG] STATS_CSV is None!")
         return
 
     try:
@@ -72,7 +73,8 @@ def log_stats(loja: str, modo: str, copies: int):
         # Append data
         with STATS_CSV.open("a", encoding="utf-8") as f:
             f.write(f"{now};{loja};{modo};{copies}\n")
-    except Exception:
+    except Exception as e:
+        print(f"[DEBUG] Erro ao gravar stats: {e}")
         # Falha silenciosa em stats para não parar fluxo
         pass
 

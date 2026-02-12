@@ -13,7 +13,8 @@ from app.services.mapping_service import load_printer_map_from
 from app.services.product_service import consulta_Base, busca_por_descricao
 from app.services.printing_service import enviar_para_impressora_ip
 from app.services.templates_service import list_templates_by_mode, render_zpl
-from app.services.log_service import log_audit, log_error
+from app.services.templates_service import list_templates_by_mode, render_zpl
+from app.services.log_service import log_audit, log_error, log_stats
 from app.services.trace_service import start_trace
 
 bp = Blueprint("api", __name__, url_prefix="/api")
@@ -267,6 +268,8 @@ def print_label():
 
     if sucesso:
         trace.add("print_success", copies=copies)
+        # Registra estatística
+        log_stats(loja=loja_map["loja"], modo=modo, copies=copies)
     else:
         trace.add("print_failed", ip=printer_ip)
 
@@ -499,9 +502,14 @@ def get_stats():
     # Calcula média diária
     media_diaria = round(total_etiquetas / max(dias, 1), 1)
 
+    # Merge com todas as lojas cadastradas (para dropdown não ficar vazio se não tiver histórico)
+    mappings = load_printer_map_from(DIRS["data"])
+    todas_lojas = {p["loja"] for p in mappings if p.get("loja")}
+    lojas_set.update(todas_lojas)
+
     return jsonify({
         "total": total_etiquetas,
-        "lojas": sorted(list(lojas_set)),
+        "lojas": sorted(list(lojas_set), key=lambda x: int(x) if x.isdigit() else 9999),
         "media_diaria": media_diaria,
         "por_loja": por_loja,
         "por_dia": por_dia,
