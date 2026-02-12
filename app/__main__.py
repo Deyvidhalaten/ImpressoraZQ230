@@ -38,7 +38,8 @@ loggers = setup_logging(DIRS["logs"])
 init_loggers(
     audit=loggers["audit"],
     error=loggers["error"],
-    audit_jsonl=DIRS["logs"] / "audit.jsonl"
+    audit_jsonl=DIRS["logs"] / "audit.jsonl",
+    stats_csv=DIRS["logs"] / "stats.csv"
 )
 
 # --- Flask app ---
@@ -52,46 +53,12 @@ app.config["DB"]     = load_db_flor_from(DIRS["data"])
 app.config["DB_FLV"] = load_db_flv_from(DIRS["data"])
 zpl_templates_dir = DIRS["templates"]  # ProgramData\BistekPrinter\zpl_templates
 
-zpl_env = Environment(
-    loader=FileSystemLoader(zpl_templates_dir),
-    autoescape=False,  # desativa escape (ZPL é puro texto)
-    trim_blocks=True,
-    lstrip_blocks=True
-)
+
 
 app.config["ZPL_ENV"] = criar_ambiente_zpl(zpl_templates_dir)
 
 # Filtros Customizados
-def filter_d1(val):
-    try:
-        return f"{float(val):.1f}".replace('.', ',')
-    except:
-        return "0,0"
 
-def filter_kj(val):
-    try:
-        return str(int(float(val) * 4.184))
-    except:
-        return "0"
-
-def filter_vd(val, tipo):
-    refs = {
-        "kcal": 2000, "carb": 300, "prot": 75, "gord": 55,
-        "sat": 22, "fibra": 25, "sodio_mg": 2400
-    }
-    try:
-        ref = refs.get(tipo)
-        if not ref: return "**"
-        v = float(val)
-        return str(int((v / ref) * 100))
-    except:
-        return "0"
-
-zpl_env.filters["d1"] = filter_d1
-zpl_env.filters["kj"] = filter_kj
-zpl_env.filters["vd"] = filter_vd
-
-app.config["ZPL_ENV"] = zpl_env
 
 # Fonte (fallback)
 windows_font = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts", "arial.ttf")

@@ -10,7 +10,7 @@ from app.services.mapping_service import load_printer_map_from
 from app.services.product_service import consulta_Base
 from app.services.printing_service import enviar_para_impressora_ip
 from app.services.templates_service import list_templates_by_mode, render_zpl
-from app.services.log_service import log_audit, log_error
+from app.services.log_service import log_audit, log_error, log_stats
 from app.services.trace_service import start_trace, get_trace
 
 bp = Blueprint("main", __name__)
@@ -225,6 +225,7 @@ def index():
 
     if sucesso:
         trace.add("print_success", copies=copies)
+        log_stats(loja_map["loja"], modo, copies)
     if not sucesso:
         trace.add("print_failed", ip=printer_ip)
 

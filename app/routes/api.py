@@ -402,108 +402,105 @@ def update_ls():
 
 @bp.route("/stats", methods=["GET", "OPTIONS"])
 def get_stats():
-    """Retorna estatísticas de impressão baseadas no audit.jsonl corretamente parseado."""
+    """Retorna estatísticas de impressão baseadas no stats.csv."""
     if request.method == "OPTIONS":
         return "", 204
 
-    import json
     from datetime import datetime, timedelta
-    from app.services.mapping_service import load_printer_map_from
 
     DIRS = current_app.config["DIRS"]
-    audit_jsonl = DIRS["logs"] / "audit.jsonl"
+    stats_csv = DIRS["logs"] / "stats.csv"
 
-    dias = int(request.args.get("dias", 30))
+    # Parâmetros
+    try:
+        dias = int(request.args.get("dias", 30))
+    except:
+        dias = 30
     filtro_loja = request.args.get("loja")
 
     cutoff = datetime.now() - timedelta(days=dias)
 
     por_loja = {}
     por_dia = {}
-    total = 0
+    total_etiquetas = 0
     lojas_set = set()
-    
-    # Carrega mapeamento de lojas para identificar por IP
-    mappings = load_printer_map_from(DIRS["data"])
 
-    if audit_jsonl.exists():
-        with open(audit_jsonl, "r", encoding="utf-8") as f:
-            for line in f:
-                try:
-                    entry = json.loads(line.strip())
+    if stats_csv.exists():
+        try:
+            with open(stats_csv, "r", encoding="utf-8") as f:
+                # Pula header se houver
+                first_line = True
+                for line in f:
+                    line = line.strip()
+                    if not line: 
+                        continue
                     
-                    # O formato do log é {"trace_id": "...", "events": [...], ...}
-                    events = entry.get("events", [])
-                    if not isinstance(events, list):
+                    # Ignora header
+                    if first_line and (line.lower().startswith("data") or "loja" in line.lower()):
+                        first_line = False
+                        continue
+                    first_line = False
+
+                    # Formato: Data;Loja;Modo;Qtd
+                    # Ex: 2026-02-12 08:30:00;Loja 17;flv;15
+                    parts = line.split(";")
+                    if len(parts) < 4:
                         continue
 
-                    # Verifica se houve sucesso de impressão
-                    print_success_event = next((e for e in events if e.get("event") == "print_success"), None)
-                    if not print_success_event:
-                        continue
-                        
-                    # Verifica explicitamente se NÃO teve produto_nao_encontrado (redundante pois print_success implica que achou, mas pedido explícito)
-                    produto_nao_encontrado = next((e for e in events if e.get("event") == "produto_nao_encontrado"), None)
-                    if produto_nao_encontrado:
-                        continue
-
-                    # Extrai data do evento de sucesso ou do primeiro evento
-                    ts_str = print_success_event.get("t") or (events[0].get("t") if events else "")
-                    if not ts_str:
-                        continue
+                    data_str, loja, modo, qtd_str = parts[0], parts[1], parts[2], parts[3]
 
                     try:
-                        # Formato esperado: "YYYY-MM-DD HH:MM:SS"
-                        ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
-                    except ValueError:
-                        try:
-                            ts = datetime.fromisoformat(ts_str)
-                        except:
-                            continue
-
-                    if ts < cutoff:
+                        # Tenta diversos formatos de data só por segurança
+                        # O padrão gravado é "%Y-%m-%d %H:%M:%S"
+                        if "/" in data_str:
+                            dt = datetime.strptime(data_str, "%d/%m/%Y %H:%M:%S")
+                        else:
+                            dt = datetime.strptime(data_str, "%Y-%m-%d %H:%M:%S")
+                    except:
                         continue
 
-                    # Identifica loja pelo IP do evento 'inicio'
-                    inicio_event = next((e for e in events if e.get("event") == "inicio"), None)
-                    client_ip = inicio_event.get("ip") if inicio_event else None
+                    if dt < cutoff:
+                        continue
                     
-                    loja = "Desconhecida"
-                    if client_ip:
-                         # Tenta casar IP com loja usando fnmatch (mesma lógica do context)
-                        printer_match = next((p for p in mappings if fnmatch.fnmatch(client_ip, p["pattern"])), None)
-                        if printer_match:
-                            loja = printer_match["loja"]
-                        else:
-                            # Tenta extrair do IP se for 10.x.y.z -> x
-                            parts = client_ip.split(".")
-                            if len(parts) == 4 and parts[0] == "10":
-                                loja = parts[1]
-
+                    # Extrai número da loja se possível ("Loja 17" -> "17")
+                    # Frontend espera string, então vamos manter o que está no CSV ou limpar
+                    # O CSV gravado pelo log_stats usa "Loja XX" ou o que vier de loja_map["loja"]
+                    # Vamos assumir que o valor gravado é o ID da loja "17" ou "Loja 17"
+                    # Se o ID for numérico, melhor.
+                    # Mas o log_stats grava `loja_map["loja"]`. No context, loja é "17".
+                    # Exemplo do user: "Loja 17". Então vamos usar a string inteira.
+                    
+                    # Ajuste: se o filtro vier "17" e no CSV tiver "Loja 17", precisamos normalizar?
+                    # O filtro vem do frontend que é populado pela própria API.
+                    
                     lojas_set.add(loja)
 
                     if filtro_loja and loja != filtro_loja:
                         continue
 
-                    # Atualiza contadores
-                    copies = int(print_success_event.get("copies", 1))
-                    total += copies
+                    try:
+                        qtd = int(qtd_str)
+                    except:
+                        qtd = 1
+                    
+                    total_etiquetas += qtd
+                    
+                    # Agregações
+                    por_loja[loja] = por_loja.get(loja, 0) + qtd
+                    
+                    dia_key = dt.strftime("%d/%m")
+                    por_dia[dia_key] = por_dia.get(dia_key, 0) + qtd
 
-                    por_loja[loja] = por_loja.get(loja, 0) + copies
+        except Exception as e:
+            print(f"Erro ao ler stats.csv: {e}")
+            # Retorna vazio em caso de erro de leitura
+            pass
 
-                    dia = ts.strftime("%d/%m")
-                    por_dia[dia] = por_dia.get(dia, 0) + copies
-
-                except json.JSONDecodeError:
-                    continue
-                except Exception as e:
-                    # Logar erro de parse silenciosamente ou printar em dev
-                    continue
-
-    media_diaria = round(total / max(dias, 1), 1)
+    # Calcula média diária
+    media_diaria = round(total_etiquetas / max(dias, 1), 1)
 
     return jsonify({
-        "total": total,
+        "total": total_etiquetas,
         "lojas": sorted(list(lojas_set)),
         "media_diaria": media_diaria,
         "por_loja": por_loja,

@@ -37,7 +37,7 @@ def init_data_layout(repo_base_dir: str) -> dict:
     # Seeds
     seeds_dir = Path(repo_base_dir) / "seeds"
     if seeds_dir.is_dir():
-        for name in ("baseFloricultura.csv", "baseFatiados.csv", "printers.csv"):
+        for name in ("baseFloricultura.csv", "baseFatiados.csv", "printers.csv", "baseFLV_normalizada.csv"):
             _copy_if_missing(seeds_dir / name, dirs["data"] / name)
 
     # Migração
