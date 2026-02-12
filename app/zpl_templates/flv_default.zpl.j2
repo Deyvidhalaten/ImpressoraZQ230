@@ -1,29 +1,32 @@
 ^XA
-^PW999^FS
+^PRD^FS
 ^LS{{ ls }}^FS
+^LH0,0^FS
+^LL400^FS
+^JMA^FS
 ^BY2
 
-^FO220,50^A0N,50,20^FD{{ texto }}^FS
+^FO90,50^A0N,50,20^FD{{ texto }}^FS
 
-^FO220,115^A0N,15,20^FDInformacao nutricional - *%VD.Porcao de {{ nutri.porcao }}g^FS
-^FO220,135^A0N,15,20^FD1 PORCAO(ES)^FS
+^FO90,115^A0N,15,20^FDInformacao nutricional - *%VD.Porcao de {{ nutri.porcao }}g^FS
+^FO90,135^A0N,15,20^FD1 PORCAO(ES)^FS
 
-^FO220,155^A0N,15,20^FDValor energetico: {{ nutri.kcal|d1 }}kcal = {{ nutri.kcal|kj }}kJ - {{ nutri.kcal|vd('kcal') }}%VD^FS
-^FO220,175^A0N,15,20^FDCarboidratos: {{ nutri.carb|d1 }}g - {{ nutri.carb|vd('carb') }}%VD^FS
-^FO220,195^A0N,15,20^FDProteinas: {{ nutri.prot|d1 }}g - {{ nutri.prot|vd('prot') }}%VD^FS
-^FO220,215^A0N,15,20^FDGorduras totais: {{ nutri.gord|d1 }}g - {{ nutri.gord|vd('gord') }}%VD^FS
-^FO220,235^A0N,15,20^FDGorduras saturadas: {{ nutri.sat|d1 }}g - {{ nutri.sat|vd('sat') }}%VD^FS
-^FO220,255^A0N,15,20^FDGorduras trans: {{ nutri.trans|d1 }}g**^FS
-^FO220,275^A0N,15,20^FDFibra alimentar: {{ nutri.fibra|d1 }}g - {{ nutri.fibra|vd('fibra') }}%VD^FS
-^FO220,295^A0N,15,20^FDSodio: {{ nutri.sodio_mg|d1 }}mg - {{ nutri.sodio_mg|vd('sodio_mg') }}%VD^FS
+^FO90,155^A0N,15,20^FDValor energetico: {{ nutri.kcal|d1 }}kcal = {{ nutri.kcal|kj }}kJ - {{ nutri.kcal|vd('kcal') }}%VD^FS
+^FO90,175^A0N,15,20^FDCarboidratos: {{ nutri.carb|d1 }}g - {{ nutri.carb|vd('carb') }}%VD^FS
+^FO90,195^A0N,15,20^FDProteinas: {{ nutri.prot|d1 }}g - {{ nutri.prot|vd('prot') }}%VD^FS
+^FO90,215^A0N,15,20^FDGorduras totais: {{ nutri.gord|d1 }}g - {{ nutri.gord|vd('gord') }}%VD^FS
+^FO90,235^A0N,15,20^FDGorduras saturadas: {{ nutri.sat|d1 }}g - {{ nutri.sat|vd('sat') }}%VD^FS
+^FO90,255^A0N,15,20^FDGorduras trans: {{ nutri.trans|d1 }}g**^FS
+^FO90,275^A0N,15,20^FDFibra alimentar: {{ nutri.fibra|d1 }}g - {{ nutri.fibra|vd('fibra') }}%VD^FS
+^FO90,295^A0N,15,20^FDSodio: {{ nutri.sodio_mg|d1 }}mg - {{ nutri.sodio_mg|vd('sodio_mg') }}%VD^FS
 
-^FO220,320^A0N,15,20^FD*%Valores diarios de referencia com base em uma^FS
-^FO220,340^A0N,15,20^FDDieta de 2.000kcal ou 8.400kJ.^FS
-^FO220,360^A0N,15,20^FD**VD nao estabelecido.^FS
+^FO90,320^A0N,15,20^FD*%Valores diarios de referencia com base em uma^FS
+^FO90,340^A0N,15,20^FDDieta de 2.000kcal ou 8.400kJ.^FS
+^FO90,360^A0N,15,20^FD**VD nao estabelecido.^FS
 
-^FO260,440^A0N,25,20^FD{{ codprod }}^FS
-^FO250,460^BEN,50,Y,N^FD{{ ean }}^FS
-^FO220,550^A0N,40,30^FDValidade: {{ validade }} Dias^FS
-^FO220,590^A0N,40,30^FDProduzido: {{ data }}^FS
+^FO130,440^A0N,25,20^FD{{ codprod }}^FS
+^FO120,460^BEN,50,Y,N^FD{{ ean }}^FS
+^FO90,550^A0N,40,30^FDValidade: {{ validade }} Dias^FS
+^FO90,590^A0N,40,30^FDProduzido: {{ data }}^FS
 ^PQ{{ copies }},0,1,N
 ^XZ

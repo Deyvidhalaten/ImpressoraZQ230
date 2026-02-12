@@ -1,14 +1,14 @@
 loja,pattern,nome,funcao,ip,ls_flor,ls_flv
-2,10.2.*,Mataburro,Floricultura;FLV,10.2.30.109,0,0
-3,10.3.*,Mataburro,Floricultura;FLV,10.3.30.110,0,0
-4,10.4.*,Retaguarda-Mataburro,Floricultura;FLV,10.4.30.116,0,0
-5,10.5.*,Mataburro,Floricultura;FLV,10.5.30.111,0,0
+2,10.2.*,Mataburro,Floricultura;FLV,10.2.30.109,50,-100
+3,10.3.*,Mataburro,Floricultura;FLV,10.3.30.110,0,-50
+4,10.4.*,Retaguarda-Mataburro,Floricultura;FLV,10.4.30.116,50,-100
+5,10.5.*,Mataburro,Floricultura;FLV,10.5.30.111,60,-60
 7,10.7.*,Mataburro,Floricultura;FLV,10.7.30.140,0,0
 8,10.8.*,Mataburro,Floricultura;FLV,10.8.30.104,0,0
 8,10.8.*,Mataburro,Floricultura;FLV,10.8.30.105,0,0
 8,10.8.*,Mataburro,Floricultura;FLV,10.8.30.106,0,0
 8,10.8.*,Mataburro,Floricultura;FLV,10.8.30.110,0,0
-9,10.9.*,Mata Burro,Floricultura;FLV;Estoque Padaria,10.9.30.127,0,0
+9,10.9.*,Mata Burro,Floricultura;FLV;Estoque Padaria,10.9.30.127,50,-80
 10,10.10.*,Mataburro,Floricultura;FLV,10.10.30.150,0,0
 11,10.11.*,Mataburro,Floricultura;FLV,10.11.30.129,0,0
 12,10.12.*,Mataburro,Floricultura;FLV,10.12.30.118,0,0
@@ -16,13 +16,13 @@ loja,pattern,nome,funcao,ip,ls_flor,ls_flv
 15,10.15.*,Mataburro,Floricultura;FLV,10.15.30.228,0,0
 15,10.15.*,Mataburro,Floricultura;FLV,10.15.30.204,0,0
 16,10.16.*,Mataburro,Floricultura;FLV,10.16.30.67,0,0
-17,10.17.*,Mataburro,Floricultura;FLV,10.17.30.118,0,0
-17,10.17.*,Frente de Caixa,Floricultura;FLV;Estoque Padaria,10.17.30.119,0,0
+17,10.17.*,Mataburro,Floricultura;FLV,10.17.30.118,50,-120
+17,10.17.*,Frente de Caixa,Floricultura;FLV;Estoque Padaria,10.17.30.119,50,-80
 18,10.18.*,Mataburro,Floricultura;FLV,10.18.30.127,0,0
 19,10.19.*,Mataburro,Floricultura;FLV,,0,0
 20,10.20.*,Mataburro,Floricultura;FLV,,0,0
 22,10.22.*,Mataburro,Floricultura;FLV,10.22.30.106,0,0
-23,10.23.*,Mataburro,Floricultura;FLV,10.23.30.119,0,0
+23,10.23.*,Mataburro,Floricultura;FLV,10.23.30.119,0,-20
 24,10.24.*,Mataburro,Floricultura;FLV,10.24.30.127,0,0
 25,10.25.*,Mataburro,Floricultura;FLV,10.25.30.158,0,0
 25,10.25.*,Mataburro,Floricultura;FLV,10.25.30.159,0,0
