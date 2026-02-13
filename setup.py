@@ -34,6 +34,7 @@ includefiles = [
     ("app/routes", "app/routes"),
     ("app/services", "app/services"),
     ("app/printer_zq230.py", "app/printer_zq230.py"),
+    ("frontend", "frontend"),
 ]
 
 # DLLs do pywin32

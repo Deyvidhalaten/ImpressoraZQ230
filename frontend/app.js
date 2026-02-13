@@ -65,6 +65,11 @@ const elements = {
 // Toast Notifications
 // ============================================
 function showToast(type, title, message, duration = 5000) {
+    // Ajuste para Mobile: Tempo reduzido (2s) se a tela for pequena
+    if (window.innerWidth <= 600) {
+        duration = 2000;
+    }
+
     const icons = {
         success: '✅',
         error: '❌',

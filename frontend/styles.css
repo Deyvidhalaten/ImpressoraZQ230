@@ -285,6 +285,7 @@ body {
 /* Print Section */
 .print-section {
     max-width: 900px;
+    margin: 0 auto;
 }
 
 .print-card {
@@ -1025,4 +1026,83 @@ body {
 
 .product-loading span {
     animation: pulse 1.5s infinite;
+}
+
+/* ============================================
+   Mobile Responsive (Max Width 600px)
+   ============================================ */
+@media (max-width: 600px) {
+
+    /* Hide Admin & Stats Navigation */
+    .nav-link {
+        display: none !important;
+    }
+
+    /* Adjust Header */
+    .header {
+        padding: var(--space-sm) var(--space-md);
+    }
+
+    .logo-img {
+        height: 32px;
+    }
+
+    .logo h1 {
+        font-size: 1.25rem;
+    }
+
+    /* Compact Layout */
+    .main-content {
+        padding: var(--space-md) var(--space-sm);
+    }
+
+    .section-title {
+        font-size: 0.875rem;
+        margin-bottom: var(--space-sm);
+    }
+
+    .print-card {
+        padding: var(--space-md);
+    }
+
+    .print-form {
+        gap: var(--space-md);
+    }
+
+    .form-row {
+        gap: var(--space-md);
+    }
+
+    .form-input,
+    .form-select,
+    .btn {
+        padding: var(--space-sm) var(--space-md);
+        font-size: 0.9375rem;
+    }
+
+    .btn-print {
+        padding: var(--space-md);
+    }
+
+    /* Adjust Info Cards to be more compact */
+    .info-cards {
+        gap: var(--space-sm);
+        margin-bottom: var(--space-md);
+        display: none;
+        /* Hide info cards on mobile as requested to leave only print screen */
+    }
+
+    /* Ensure Print Section is full width */
+    .print-section {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    /* Move Toasts to Top on Mobile */
+    .toast-container {
+        top: var(--space-md);
+        bottom: auto;
+        left: var(--space-md);
+        right: var(--space-md);
+    }
 }

@@ -78,7 +78,10 @@ app.register_blueprint(api_bp)
 # Serve arquivos do novo frontend (pasta frontend/)
 from flask import send_from_directory
 
-FRONTEND_DIR = os.path.join(os.path.dirname(BASE_DIR), "frontend")
+if getattr(sys, "frozen", False):
+    FRONTEND_DIR = os.path.join(os.path.dirname(sys.executable), "frontend")
+else:
+    FRONTEND_DIR = os.path.join(os.path.dirname(BASE_DIR), "frontend")
 
 @app.route("/frontend/<path:filename>")
 def serve_frontend(filename):
