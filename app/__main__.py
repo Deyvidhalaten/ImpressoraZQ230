@@ -6,6 +6,7 @@ from app.constants import BASE_DIR, SECRET_KEY, PERMANENT_SESSION_LIFETIME
 from app.bootstrap import init_data_layout
 from app.services.logging_setup import setup_logging
 from app.services.log_service import init_loggers
+from app.services.auth_service import init_users_file
 from app.services.product_service import load_db_flor_from, load_db_flv_from
 from app.services.mapping_service import load_printer_map_from
 from app.routes.main import bp as main_bp
@@ -34,6 +35,7 @@ else:
 
 # --- ProgramData + semeadura de seeds/templates ---
 DIRS = init_data_layout(REPO_BASE)
+init_users_file(DIRS["data"])
 loggers = setup_logging(DIRS["logs"])
 init_loggers(
     audit=loggers["audit"],

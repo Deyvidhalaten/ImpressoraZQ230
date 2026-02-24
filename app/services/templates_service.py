@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import math
 from typing import Dict, List, Optional
+import re
 
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 
@@ -76,35 +77,52 @@ def calcular_vd_percentual(valor, chave_ref: str) -> str:
 # ============================================================
 def listar_templates_por_modo(templates_dir: Path) -> Dict[str, List[str]]:
     """
-    Procura arquivos *.zpl.j2 e agrupa por "modo" usando o prefixo antes do primeiro "_".
-    Ex:
-      flv_default.zpl.j2         -> modo "flv"
-      floricultura_default.zpl.j2-> modo "floricultura"
-      calcados_etiqueta.zpl.j2   -> modo "calcados"
+    Procura arquivos *.zpl e *.zpl.j2 e agrupa por "modo".
+    Adiciona logs para monitorar a detecção em runtime.
     """
     modos: Dict[str, List[str]] = {}
 
+    import traceback
+    try:
+        from app.services.log_service import log_error, log_audit
+    except ImportError:
+        def log_error(acao, erro, **kwargs):
+            print(f"[ERRO TEMPLATES] {acao}: {erro}")
+        def log_audit(acao, **kwargs):
+            print(f"[AUDIT TEMPLATES] {acao}: {kwargs}")
+
     if not templates_dir.exists():
+        log_error("templates_not_found", erro=f"O diretório {templates_dir} não existe ou está inacessível.")
         return modos
 
-    for f in templates_dir.glob("*.zpl.j2"):
-        nome = f.name
-        lower = nome.lower()
+    found_files = []
+    for ext in ("*.zpl", "*.zpl.j2"):
+        for f in templates_dir.glob(ext):
+            nome = f.name
+            lower = nome.lower()
+            found_files.append(nome)
 
-        if "_" not in lower:
-            # sem prefixo de modo, ignora
-            continue
+            base_name = lower.replace(".zpl.j2", "").replace(".zpl", "")
+            
+            if base_name.endswith("_default"):
+                modo = base_name.replace("_default", "").strip()
+            elif "_" in base_name and any(base_name.endswith(x) for x in ["_v2", "_var", "_promo"]):
+                modo = base_name.rsplit("_", 1)[0].strip()
+            elif "_" in base_name:
+                modo = base_name.strip()
+            else:
+                modo = base_name.strip()
 
-        modo = lower.split("_", 1)[0].strip()
-        if not modo:
-            continue
+            if not modo:
+                continue
 
-        modos.setdefault(modo, []).append(nome)
+            modos.setdefault(modo, []).append(nome)
 
-    # ordena para UI ficar bonitinha
     for m in modos:
+        modos[m] = list(set(modos[m]))
         modos[m].sort()
 
+    log_audit("templates_scanned", dir=str(templates_dir), qtd_arquivos=len(found_files), files=found_files, modos_extraidos=list(modos.keys()))
     return modos
 
 
@@ -138,5 +156,37 @@ def render_zpl(env: Environment, template_name: str, **ctx) -> str:
         return env.get_template(template_name).render(**ctx)
     except TemplateNotFound as e:
         raise RuntimeError(f"Template ZPL não encontrado: {template_name}") from e
+
+def render_zpl_dynamico(template_path: Path, **ctx) -> str:
+    """
+    Lê um arquivo ZPL plano e substitui {{ variaveis }} dinamicamente via Regex.
+    Suporta dot notation para acessar dicionários (ex: nutri.kcal).
+    """
+    if not template_path.exists():
+        raise RuntimeError(f"Template ZPL dinâmico não encontrado: {template_path.name}")
+        
+    with template_path.open("r", encoding="utf-8") as f:
+        content = f.read()
+
+    def replace_match(match):
+        tag = match.group(1).strip()
+        parts = tag.split('.')
+        val = ctx
+        
+        for part in parts:
+            if isinstance(val, dict):
+                val = val.get(part, "")
+            else:
+                val = ""
+                break
+                
+        if val is None:
+            val = ""
+            
+        return str(val)
+
+    # Captura tudo entre {{ }} (espaços opcionais)
+    processed = re.sub(r"\{\{\s*(.*?)\s*\}\}", replace_match, content)
+    return processed
 
 list_templates_by_mode = listar_templates_por_modo

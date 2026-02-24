@@ -130,13 +130,16 @@ function renderRedeChart(data) {
 
     if (redeChart) redeChart.destroy();
 
+    const labels = Array.isArray(data) ? data.map(d => d.label) : Object.keys(data);
+    const values = Array.isArray(data) ? data.map(d => d.value) : Object.values(data);
+
     redeChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: Object.keys(data),
+            labels: labels,
             datasets: [{
                 label: 'Etiquetas',
-                data: Object.values(data),
+                data: values,
                 borderColor: '#6366f1',
                 backgroundColor: 'rgba(99, 102, 241, 0.1)',
                 fill: true,

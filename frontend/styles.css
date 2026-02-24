@@ -282,6 +282,31 @@ body {
     box-shadow: 0 4px 15px rgba(227, 30, 36, 0.3);
 }
 
+.mode-select {
+    width: 100%;
+    max-width: 300px;
+    padding: var(--space-md) var(--space-xl);
+    background: var(--bg-card);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    background-size: 1em;
+}
+
+.mode-select:focus,
+.mode-select:hover {
+    border-color: var(--accent-primary);
+    outline: none;
+}
+
 /* Print Section */
 .print-section {
     max-width: 900px;

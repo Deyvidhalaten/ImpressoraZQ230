@@ -32,6 +32,54 @@ def _with_request_context(data: dict) -> dict:
 # ---------------------------------------------------------
 STATS_CSV: Path | None = None
 
+def cleanup_old_logs(logs_dir: Path):
+    """Limpa logs (CSV e JSONL) com mais de 3 anos, executado mensalmente."""
+    try:
+        from datetime import datetime, timedelta
+        
+        cleanup_file = logs_dir / ".cleanup_run"
+        current_month = datetime.now().strftime("%Y-%m")
+        
+        if cleanup_file.exists():
+            with cleanup_file.open("r", encoding="utf-8") as f:
+                if f.read().strip() == current_month:
+                    return  # Já rodou neste mês
+                    
+        cutoff_date = datetime.now() - timedelta(days=3*365)
+        
+        # Rotaciona CSV
+        stats_csv = logs_dir / "stats.csv"
+        if stats_csv.exists():
+            lines_to_keep = []
+            with stats_csv.open("r", encoding="utf-8") as f:
+                lines = f.readlines()
+                if lines:
+                    lines_to_keep.append(lines[0])  # Header
+                    for line in lines[1:]:
+                        parts = line.split(";")
+                        if len(parts) >= 4:
+                            try:
+                                dt_str = parts[0]
+                                if "/" in dt_str:
+                                    dt = datetime.strptime(dt_str, "%d/%m/%Y %H:%M:%S")
+                                else:
+                                    dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
+                                if dt >= cutoff_date:
+                                    lines_to_keep.append(line)
+                            except:
+                                lines_to_keep.append(line)  # Em caso de erro de parse, mantém
+                        else:
+                            lines_to_keep.append(line)
+                            
+            with stats_csv.open("w", encoding="utf-8") as f:
+                f.writelines(lines_to_keep)
+                
+        # Atualiza marcador mensal
+        with cleanup_file.open("w", encoding="utf-8") as f:
+            f.write(current_month)
+    except Exception as e:
+        print(f"[DEBUG] Erro em cleanup_old_logs: {e}")
+
 def init_loggers(audit, error, audit_jsonl: Path | None, stats_csv: Path | None = None):
     global AUDIT_LOGGER, ERROR_LOGGER, AUDIT_JSONL, STATS_CSV
     AUDIT_LOGGER   = audit
@@ -46,6 +94,8 @@ def init_loggers(audit, error, audit_jsonl: Path | None, stats_csv: Path | None 
             if not STATS_CSV.exists():
                 with STATS_CSV.open("w", encoding="utf-8") as f:
                     f.write("Data;Loja;Modo;Qtd\n")
+                    
+            cleanup_old_logs(STATS_CSV.parent)
         except Exception:
             pass # Logger de erro talvez não esteja pronto, falha silenciosa no init
 

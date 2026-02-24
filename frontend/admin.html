@@ -18,9 +18,12 @@
                 <div class="logo">
                     <img src="logo-bistek.png" alt="Bistek" class="logo-img">
                 </div>
-                <nav class="header-nav">
+                <nav class="header-nav" style="display: flex; align-items: center; gap: 1rem;">
                     <a href="index.html" class="nav-link">🏷️ Impressão</a>
                     <a href="stats.html" class="nav-link">📊 Estatísticas</a>
+                    <button class="btn btn-small btn-danger"
+                        onclick="localStorage.removeItem('adminToken'); window.location.href='login.html'"
+                        style="margin-left: 1rem;">Sair</button>
                 </nav>
             </div>
         </header>
@@ -41,20 +44,21 @@
 
             <!-- Configuração de LS -->
             <section class="admin-section">
-                <h2 class="section-title">Configurar Margem (LS)</h2>
+                <h2 class="section-title">Configurar Funções e Margem (LS)</h2>
                 <div class="card">
                     <form id="lsForm" class="admin-form">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="lsFlor" class="form-label">LS Floricultura</label>
-                                <input type="number" id="lsFlor" class="form-input" value="0">
-                            </div>
-                            <div class="form-group">
-                                <label for="lsFlv" class="form-label">LS FLV</label>
-                                <input type="number" id="lsFlv" class="form-input" value="0">
-                            </div>
+                        <div class="form-group" style="width: 100%; margin-bottom: 1rem;">
+                            <label for="editFuncao" class="form-label">Funções Habilitadas (Segure CTRL para
+                                múltiplos)</label>
+                            <select id="editFuncao" class="form-select" multiple>
+                                <!-- Preenchido via JS baseado nos modos do servidor -->
+                            </select>
                         </div>
-                        <button type="submit" class="btn btn-primary">💾 Salvar Configurações</button>
+                        <div class="form-row" id="lsInputsContainer" style="flex-wrap: wrap;">
+                            <!-- Preenchido via JS de acordo com os Modos da Loja -->
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="margin-top: 1rem;">💾 Salvar
+                            Configurações</button>
                     </form>
                 </div>
             </section>
@@ -70,8 +74,7 @@
                                     <th>Loja</th>
                                     <th>Nome</th>
                                     <th>Função</th>
-                                    <th>LS Flor</th>
-                                    <th>LS FLV</th>
+                                    <th>Margens (LS)</th>
                                     <th>Ações</th>
                                 </tr>
                             </thead>
@@ -104,23 +107,15 @@
                                 <label for="newIp" class="form-label">IP da Impressora</label>
                                 <input type="text" id="newIp" class="form-input" placeholder="Ex: 10.4.30.116" required>
                             </div>
-                            <div class="form-group">
-                                <label for="newFuncao" class="form-label">Função</label>
+                            <div class="form-group" style="width: 100%;">
+                                <label for="newFuncao" class="form-label">Função (Segure CTRL para múltiplos)</label>
                                 <select id="newFuncao" class="form-select" multiple>
-                                    <option value="floricultura">Floricultura</option>
-                                    <option value="flv">FLV</option>
+                                    <!-- Preenchido via JS baseado nos modos do servidor -->
                                 </select>
                             </div>
                         </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="newLsFlor" class="form-label">LS Flor</label>
-                                <input type="number" id="newLsFlor" class="form-input" value="0">
-                            </div>
-                            <div class="form-group">
-                                <label for="newLsFlv" class="form-label">LS FLV</label>
-                                <input type="number" id="newLsFlv" class="form-input" value="0">
-                            </div>
+                        <div class="form-row" id="newLsInputsContainer" style="flex-wrap: wrap;">
+                            <!-- Preenchido via JS com inputs LS dinâmicos -->
                         </div>
                         <button type="submit" class="btn btn-primary">➕ Adicionar Impressora</button>
                     </form>

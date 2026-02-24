@@ -1,7 +1,8 @@
 # app/services/logging_setup.py
 import os, json, socket, platform, logging, time
 from pathlib import Path
-from logging.handlers import TimedRotatingFileHandler
+from typing import Any
+from logging.handlers import RotatingFileHandler
 
 APP_NAME      = "BistekPrinter"
 APP_VERSION   = os.environ.get("BISTEK_APP_VERSION", "dev")
@@ -41,14 +42,14 @@ class JsonFormatter(logging.Formatter):
             base["exception"] = self.formatException(record.exc_info)
         return json.dumps(base, ensure_ascii=False)
 
-def _make_handler(path: Path) -> TimedRotatingFileHandler:
+def _make_handler(path: Path) -> RotatingFileHandler:
     path.parent.mkdir(parents=True, exist_ok=True)
-    h = TimedRotatingFileHandler(
+    # Rotação por tamanho (Limite agressivo de 5MB para evitar superlotação visual para o usuário)
+    h = RotatingFileHandler(
         filename=str(path),
-        when="midnight",
-        backupCount=7,           # mantém 7 dias
-        encoding="utf-8",
-        utc=False
+        maxBytes=5 * 1024 * 1024,  # 5 MB
+        backupCount=2,             # Mínimo de backups
+        encoding="utf-8"
     )
     h.setFormatter(JsonFormatter())
     return h

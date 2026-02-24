@@ -10,105 +10,122 @@ def _resolve_data_dir(data_dir: Optional[Path]) -> Path:
         from flask import current_app
         return current_app.config["DIRS"]["data"]
     except Exception:
-        from app.bootstrap import get_programdata_root
-        return get_programdata_root() / "data"
+        from app.bootstrap import get_appdata_root
+        return get_appdata_root() / "data"
 
 
 def _get_valid_modes_from_templates(data_dir: Path) -> set:
     """
-    Retorna o conjunto de modos válidos a partir da pasta de templates ZPL.
-    Cada arquivo .zpl.j2 é interpretado em múltiplos níveis:
-      - até o primeiro '_' (modo base)
-      - até o penúltimo '_' (modo composto)
-    Ex: 'estoque_padaria_default.zpl.j2' -> {'estoque', 'estoque_padaria'}
+    Retorna o conjunto de modos válidos usando o serviço de templates unificado.
     """
-    zpl_dir = data_dir.parent / "zpl_templates"
-    if not zpl_dir.exists():
-        return set()
-
-    valid_modes = set()
-    for f in zpl_dir.iterdir():
-        if f.is_file() and f.suffixes[-2:] == ['.zpl', '.j2']:
-            nome = f.stem.lower()  # sem extensões -> estoque_padaria_default
-            partes = nome.split('_')
-
-            if partes:
-                valid_modes.add(partes[0])  # modo base
-
-            # adiciona variações compostas até o penúltimo underline
-            if len(partes) > 2:
-                valid_modes.add('_'.join(partes[:-1]))
-
-    return valid_modes
+    from app.services.templates_service import list_templates_by_mode
+    
+    # Dependendo de como dirs estão definidos, o zpl_templates fica geralmente no mesmo nível que 'data' ou em ProgramData.
+    try:
+        from flask import current_app
+        templates_dir = current_app.config["DIRS"]["templates"]
+    except Exception:
+        templates_dir = data_dir.parent / "zpl_templates"
+        
+    modos = list_templates_by_mode(templates_dir)
+    return set(modos.keys())
 
 
 def load_printer_map_from(data_dir: Optional[Path] = None) -> List[Dict]:
     """
-    Lê o arquivo printers.csv e retorna uma lista de dicionários normalizados.
-    - Normaliza campos de texto (strip, lowercase quando aplicável)
-    - Converte LS em int
-    - Filtra 'funcao' com base nos templates válidos em zpl_templates
+    Lê o arquivo printers.json. Se não existir, migra de printers.csv.
+    Normaliza a chave 'ls' para ser um dict.
     """
     data_dir = _resolve_data_dir(data_dir)
-    path = data_dir / "printers.csv"
+    json_path = data_dir / "printers.json"
+    csv_path = data_dir / "printers.csv"
     maps: List[Dict] = []
-
-    if not path.exists():
-        return maps
 
     valid_modes = _get_valid_modes_from_templates(data_dir)
 
-    with path.open(newline='', encoding='utf-8') as f:
-        for row in csv.DictReader(f):
-            # Extrai e normaliza lista de funções
-            raw_func = (row.get('funcao') or '').strip()
-            funcs = [x.strip().lower() for x in raw_func.split(';') if x.strip()]
+    if not json_path.exists() and csv_path.exists():
+        import csv
+        from app.services.log_service import log_error
+        try:
+            with csv_path.open(newline='', encoding='utf-8') as f:
+                for row in csv.DictReader(f):
+                    raw_func = (row.get('funcao') or '').strip()
+                    funcs = [x.strip().lower() for x in raw_func.split(';') if x.strip()]
+                    funcs_validas = [f for f in funcs if f in valid_modes] or funcs
+                    
+                    maps.append({
+                        'loja': str(row.get('loja', '')).strip(),
+                        'pattern': str(row.get('pattern', '')).strip(),
+                        'nome': (row.get('nome') or '').strip(),
+                        'ip': (row.get('ip') or '').strip(),
+                        'funcao': funcs_validas,
+                        'ls': {
+                            'floricultura': int(row.get('ls_flor', 0) or 0),
+                            'flv': int(row.get('ls_flv', 0) or 0),
+                        }
+                    })
+            save_printer_map_to(data_dir, maps)
+            return maps
+        except Exception as e:
+            log_error("Erro Migração CSV", erro=f"Falha ao tentar converter o CSV antigo para o novo formato JSON: {e}")
 
-            # Mantém apenas as funções válidas conforme templates
-            funcs_validas = [f for f in funcs if f in valid_modes] or funcs
+    if not json_path.exists():
+        return maps
 
-            maps.append({
-                'loja': str(row.get('loja', '')).strip(),
-                'pattern': str(row.get('pattern', '')).strip(),
-                'nome': (row.get('nome') or '').strip(),
-                'ip': (row.get('ip') or '').strip(),
-                'funcao': funcs_validas,
-                'ls_flor': int(row.get('ls_flor', 0) or 0),
-                'ls_flv': int(row.get('ls_flv', 0) or 0),
-            })
+    import json
+    from app.services.log_service import log_error
+    try:
+        with json_path.open('r', encoding='utf-8') as f:
+            data = json.load(f)
+            
+            if not isinstance(data, list):
+                log_error("Erro Estrutura", erro="printers.json não contém uma lista válida.")
+                return maps
+                
+            for item in data:
+                if not isinstance(item, dict):
+                    continue
+                    
+                if 'ls' not in item or not isinstance(item['ls'], dict):
+                    item['ls'] = {}
+                    
+                if 'ls_flor' in item and 'floricultura' not in item['ls']:
+                    item['ls']['floricultura'] = item.pop('ls_flor', 0)
+                if 'ls_flv' in item and 'flv' not in item['ls']:
+                    item['ls']['flv'] = item.pop('ls_flv', 0)
+                    
+                funcs = item.get('funcao', [])
+                if isinstance(funcs, str):
+                    funcs = [x.strip().lower() for x in funcs.split(';') if x.strip()]
+                item['funcao'] = [f for f in funcs if f in valid_modes] or funcs
+                
+                maps.append(item)
+    except json.JSONDecodeError as e:
+        log_error("Erro JSON", erro=f"O arquivo printers.json está corrompido ou mal formatado. O sistema usará uma lista vazia. Erro: {e}")
+    except Exception as e:
+        log_error("Erro Leitura", erro=f"Falha inesperada ao ler printers.json: {e}")
 
     return maps
 
 
 def save_printer_map_to(data_dir: Optional[Path], mappings):
-    """Salva o mapeamento de impressoras em printers.csv (sobrescreve o arquivo)."""
+    """Salva o mapeamento de impressoras em printers.json."""
     data_dir = _resolve_data_dir(data_dir)
-    path = data_dir / "printers.csv"
-    fieldnames = ['loja', 'pattern', 'nome', 'funcao', 'ip', 'ls_flor', 'ls_flv']
-
-    with path.open('w', newline='', encoding='utf-8') as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames)
-        w.writeheader()
-        for m in mappings:
-            funcs = m.get('funcao') or []
-            if isinstance(funcs, list):
-                funcao_str = ';'.join(sorted(set(funcs)))  # remove duplicados
-            else:
-                funcao_str = str(funcs)
-            w.writerow({
-                'loja': m.get('loja', ''),
-                'pattern': m.get('pattern', ''),
-                'nome': m.get('nome', ''),
-                'funcao': funcao_str,
-                'ip': m.get('ip', ''),
-                'ls_flor': m.get('ls_flor', 0),
-                'ls_flv': m.get('ls_flv', 0),
-            })
+    json_path = data_dir / "printers.json"
+    
+    import json
+    from app.services.log_service import log_error
+    try:
+        with json_path.open('w', encoding='utf-8') as f:
+            json.dump(mappings, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        log_error("Erro Escrita", erro=f"Falha ao salvar modificações no printers.json: {e}")
 
 
 # Aliases de compatibilidade
 def load_printer_map():
     return load_printer_map_from(None)
+
 
 def save_printer_map(mappings):
     return save_printer_map_to(None, mappings)

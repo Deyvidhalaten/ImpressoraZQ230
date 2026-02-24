@@ -227,26 +227,48 @@ function renderContext() {
 }
 
 function renderModeTabs() {
-    elements.modeTabs.innerHTML = state.modos.map(modo => `
-        <button 
-            class="mode-tab ${modo.key === state.currentMode ? 'active' : ''}"
-            data-mode="${modo.key}"
-        >
-            ${modo.label}
-        </button>
-    `).join('');
+    if (state.modos.length <= 4) {
+        elements.modeTabs.innerHTML = state.modos.map(modo => `
+            <button 
+                class="mode-tab ${modo.key === state.currentMode ? 'active' : ''}"
+                data-mode="${modo.key}"
+            >
+                ${modo.label}
+            </button>
+        `).join('');
 
-    // Event listeners
-    elements.modeTabs.querySelectorAll('.mode-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            state.currentMode = tab.dataset.mode;
-            localStorage.setItem('bistekprinter_mode', state.currentMode);
-            renderModeTabs();
-            updatePrinterOptions();
-            // Limpa produto selecionado ao mudar modo
-            clearSelectedProduct();
+        // Event listeners for buttons
+        elements.modeTabs.querySelectorAll('.mode-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                selectMode(tab.dataset.mode);
+            });
         });
-    });
+    } else {
+        elements.modeTabs.innerHTML = `
+            <select class="mode-select" id="modeSelectDropdown">
+                ${state.modos.map(modo => `
+                    <option value="${modo.key}" ${modo.key === state.currentMode ? 'selected' : ''}>
+                        ${modo.label}
+                    </option>
+                `).join('')}
+            </select>
+        `;
+
+        const select = document.getElementById('modeSelectDropdown');
+        select.addEventListener('change', (e) => {
+            selectMode(e.target.value);
+        });
+    }
+}
+
+function selectMode(newMode) {
+    if (state.currentMode === newMode) return;
+    state.currentMode = newMode;
+    localStorage.setItem('bistekprinter_mode', state.currentMode);
+    renderModeTabs();
+    updatePrinterOptions();
+    // Limpa produto selecionado ao mudar modo
+    clearSelectedProduct();
 }
 
 function updatePrinterOptions() {

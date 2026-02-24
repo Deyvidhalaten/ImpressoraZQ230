@@ -16,8 +16,24 @@ from app.services.templates_service import list_templates_by_mode, render_zpl
 from app.services.templates_service import list_templates_by_mode, render_zpl
 from app.services.log_service import log_audit, log_error, log_stats
 from app.services.trace_service import start_trace
+from app.services.auth_service import check_login, generate_auth_token, require_auth
 
 bp = Blueprint("api", __name__, url_prefix="/api")
+
+@bp.route("/login", methods=["POST", "OPTIONS"])
+def login():
+    if request.method == "OPTIONS":
+        return "", 204
+    
+    data = request.get_json(force=True)
+    user = data.get("username", "").strip()
+    pwd = data.get("password", "").strip()
+    
+    if check_login(user, pwd):
+        token = generate_auth_token(user)
+        return jsonify({"success": True, "token": token})
+    
+    return jsonify({"success": False, "error": "Credenciais inválidas"}), 401
 
 
 # ---------------------------------------------------------
@@ -65,8 +81,7 @@ def context():
             "nome": "Impressora Teste",
             "ip": "127.0.0.1",
             "funcao": ["floricultura", "flv"],
-            "ls_flor": 0,
-            "ls_flv": 0,
+            "ls": {"floricultura": 0, "flv": 0},
         }
         printers = [loja_map]
     elif not loja_map:
@@ -74,18 +89,13 @@ def context():
     else:
         printers = [p for p in mappings if p["loja"] == loja_map["loja"]]
 
-    # Modos válidos (baseado em templates existentes)
-    valid_modes = {
-        f.split("_")[0].lower()
-        for f in list_templates_by_mode(templates_dir).keys()
-    }
+    # Modos válidos (baseado em todos os templates existentes no backend)
+    valid_modes = list_templates_by_mode(templates_dir).keys()
 
     modos_mapeados = {}
-    for p in printers:
-        for m in p.get("funcao", []):
-            chave = m.lower().strip()
-            if chave in valid_modes:
-                modos_mapeados[chave] = " ".join(x.capitalize() for x in chave.split("_"))
+    for chave in valid_modes:
+        chave = chave.lower().strip()
+        modos_mapeados[chave] = " ".join(x.capitalize() for x in chave.split("_"))
 
     return jsonify({
         "loja": loja_map["loja"],
@@ -94,14 +104,12 @@ def context():
                 "ip": p["ip"], 
                 "nome": p.get("nome", p["ip"]), 
                 "funcao": p.get("funcao", []),
-                "ls_flor": p.get("ls_flor", 0),
-                "ls_flv": p.get("ls_flv", 0),
+                "ls": p.get("ls", {}),
             }
             for p in printers
         ],
         "modos": [{"key": k, "label": v} for k, v in sorted(modos_mapeados.items())],
-        "ls_flor": loja_map.get("ls_flor"),
-        "ls_flv": loja_map.get("ls_flv"),
+        "ls": loja_map.get("ls", {}),
         "test_mode": is_test,
     })
 
@@ -205,8 +213,7 @@ def print_label():
             "nome": "Impressora Teste",
             "ip": "127.0.0.1",
             "funcao": ["floricultura", "flv"],
-            "ls_flor": 0,
-            "ls_flv": 0,
+            "ls": {"floricultura": 0, "flv": 0},
         }
 
     if not loja_map:
@@ -234,8 +241,19 @@ def print_label():
         log_audit("impressao_falha", trace=dados)
         return jsonify({"success": False, "error": "Produto não encontrado"}), 404
 
-    # Render ZPL
-    tpl = f"{modo}_default.zpl.j2"
+    # Seleção do Template
+    templates_do_modo = list_templates_by_mode(current_app.config["DIRS"]["templates"]).get(modo, [])
+    
+    # Se o frontend mandar 'template' (futuro), usa ele. 
+    # Senão, pega o primeiro para o modo (priorizando .zpl dinâmico).
+    tpl = data.get("template")
+    if not tpl:
+        if templates_do_modo:
+            tpl = next((t for t in templates_do_modo if t.endswith(".zpl")), templates_do_modo[0])
+        else:
+            tpl = f"{modo}_default.zpl.j2"
+    
+    template_path = current_app.config["DIRS"]["templates"] / tpl
     
     # Ajuste: product_service retorna "nutri" como dict direto
     nutri_obj = rec.get("nutri") or {} 
@@ -260,7 +278,7 @@ def print_label():
         "codprod": rec["codprod"],
         "ean": ean_final,
         "copies": copies,
-        "ls": loja_map["ls_flor"] if modo == "floricultura" else loja_map["ls_flv"],
+        "ls": loja_map.get("ls", {}).get(modo, 0),
         "data": datetime.now().strftime("%d/%m/%Y"),
         "validade": rec.get("validade"),
         "infnutri": nutri_list,
@@ -268,7 +286,12 @@ def print_label():
     }
 
     try:
-        zpl = render_zpl(current_app.config["ZPL_ENV"], tpl, **ctx)
+        if tpl.endswith(".zpl"):
+            from app.services.templates_service import render_zpl_dynamico
+            zpl = render_zpl_dynamico(template_path, **ctx)
+        else:
+            zpl = render_zpl(current_app.config["ZPL_ENV"], tpl, **ctx)
+            
         trace.add("render_zpl_success", length=len(zpl))
     except Exception as e:
         trace.add("render_zpl_erro", erro=str(e))
@@ -319,16 +342,19 @@ def list_printers():
             "ip": p.get("ip"),
             "funcao": p.get("funcao", []),
             "pattern": p.get("pattern"),
-            "ls_flor": p.get("ls_flor", 0),
-            "ls_flv": p.get("ls_flv", 0),
+            "ls": p.get("ls", {}),
         }
         for p in mappings
     ])
 
 
-@bp.route("/printers", methods=["POST"])
+@bp.route("/printers", methods=["POST", "OPTIONS"])
+@require_auth
 def add_printer():
     """Adiciona uma nova impressora."""
+    if request.method == "OPTIONS":
+        return "", 204
+        
     from app.services.mapping_service import save_printer_map_to
 
     data = request.get_json(force=True)
@@ -345,8 +371,7 @@ def add_printer():
         "nome": data.get("nome", ""),
         "ip": data.get("ip", ""),
         "funcao": data.get("funcao", []),
-        "ls_flor": int(data.get("ls_flor", 0)),
-        "ls_flv": int(data.get("ls_flv", 0)),
+        "ls": data.get("ls", {}),
     }
 
     mappings.append(new_printer)
@@ -357,9 +382,13 @@ def add_printer():
     return jsonify({"success": True, "printer": new_printer})
 
 
-@bp.route("/printers", methods=["DELETE"])
+@bp.route("/printers", methods=["DELETE", "OPTIONS"])
+@require_auth
 def delete_printer():
     """Remove uma impressora."""
+    if request.method == "OPTIONS":
+        return "", 204
+        
     from app.services.mapping_service import save_printer_map_to
 
     data = request.get_json(force=True)
@@ -382,6 +411,7 @@ def delete_printer():
 
 
 @bp.route("/printers/ls", methods=["PUT", "OPTIONS"])
+@require_auth
 def update_ls():
     """Atualiza LS de uma impressora."""
     if request.method == "OPTIONS":
@@ -391,8 +421,8 @@ def update_ls():
 
     data = request.get_json(force=True)
     target_ip = data.get("ip")
-    ls_flor = int(data.get("ls_flor", 0))
-    ls_flv = int(data.get("ls_flv", 0))
+    ls_data = data.get("ls", {})
+    funcao_data = data.get("funcao")
 
     DIRS = current_app.config["DIRS"]
     mappings = load_printer_map_from(DIRS["data"])
@@ -400,8 +430,12 @@ def update_ls():
     updated = False
     for p in mappings:
         if p.get("ip") == target_ip:
-            p["ls_flor"] = ls_flor
-            p["ls_flv"] = ls_flv
+            if "ls" not in p: p["ls"] = {}
+            p["ls"].update(ls_data)
+            
+            if funcao_data is not None:
+                p["funcao"] = funcao_data
+                
             updated = True
             break
 
@@ -409,7 +443,7 @@ def update_ls():
         return jsonify({"success": False, "error": "Impressora não encontrada"}), 404
 
     save_printer_map_to(DIRS["data"], mappings)
-    log_audit("ls_update", ip=request.remote_addr, detalhes=f"ip={target_ip}, ls_flor={ls_flor}, ls_flv={ls_flv}")
+    log_audit("ls_update", ip=request.remote_addr, detalhes=f"ip={target_ip}, ls={ls_data}")
 
     return jsonify({"success": True})
 
@@ -481,15 +515,11 @@ def get_stats():
                         continue
                     
                     # Extrai número da loja se possível ("Loja 17" -> "17")
-                    # Frontend espera string, então vamos manter o que está no CSV ou limpar
+                    # Frontend espera string, por enquanto manter o que está no CSV ou limpar
                     # O CSV gravado pelo log_stats usa "Loja XX" ou o que vier de loja_map["loja"]
-                    # Vamos assumir que o valor gravado é o ID da loja "17" ou "Loja 17"
-                    # Se o ID for numérico, melhor.
+                    # O valor gravado esperado é o ID da loja "17" ou "Loja 17"
                     # Mas o log_stats grava `loja_map["loja"]`. No context, loja é "17".
-                    # Exemplo do user: "Loja 17". Então vamos usar a string inteira.
-                    
-                    # Ajuste: se o filtro vier "17" e no CSV tiver "Loja 17", precisamos normalizar?
-                    # O filtro vem do frontend que é populado pela própria API.
+                    # Exemplo do user: "Loja 17". (String)
                     
                     lojas_set.add(loja)
 
@@ -506,7 +536,7 @@ def get_stats():
                     # Agregações
                     por_loja[loja] = por_loja.get(loja, 0) + qtd
                     
-                    dia_key = dt.strftime("%d/%m")
+                    dia_key = dt.strftime("%Y-%m-%d")
                     por_dia[dia_key] = por_dia.get(dia_key, 0) + qtd
 
         except Exception as e:
@@ -522,11 +552,17 @@ def get_stats():
     todas_lojas = {p["loja"] for p in mappings if p.get("loja")}
     lojas_set.update(todas_lojas)
 
+    # Gera lista ordenada de dias para o frontend e formata de volta para DD/MM
+    sorted_por_dia = [
+        {"label": datetime.strptime(k, "%Y-%m-%d").strftime("%d/%m"), "value": v}
+        for k, v in sorted(por_dia.items())
+    ]
+
     return jsonify({
         "total": total_etiquetas,
         "lojas": sorted(list(lojas_set), key=lambda x: int(x) if x.isdigit() else 9999),
         "media_diaria": media_diaria,
         "por_loja": por_loja,
-        "por_dia": por_dia,
+        "por_dia": sorted_por_dia,
     })
 
