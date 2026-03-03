@@ -126,15 +126,25 @@ async function fetchContext() {
         // Atualiza estado
         state.loja = data.loja;
         state.printers = data.printers;
-        state.modos = data.modos;
         state.lsFlor = data.ls_flor;
         state.lsFlv = data.ls_flv;
 
-        // Recupera preferências do localStorage
+        // Cria array de todas as funções ativas de todas as impressoras da loja
+        const activeFunctions = new Set();
+        data.printers.forEach(p => {
+            if (p.funcao && Array.isArray(p.funcao)) {
+                p.funcao.forEach(f => activeFunctions.add(f.toLowerCase()));
+            }
+        });
+
+        // Filtra os modos removendo aqueles que nenhuma impressora do recinto possui permissão
+        state.modos = data.modos.filter(m => activeFunctions.has(m.key.toLowerCase()));
+
+        // Recupera preferências do localStorage ou pega o primeiro modo disponível da loja
         const savedMode = localStorage.getItem('bistekprinter_mode');
-        state.currentMode = savedMode && data.modos.some(m => m.key === savedMode)
+        state.currentMode = savedMode && state.modos.some(m => m.key === savedMode)
             ? savedMode
-            : (data.modos[0]?.key || null);
+            : (state.modos[0]?.key || null);
 
         // Atualiza UI
         renderContext();
@@ -287,9 +297,9 @@ function updatePrinterOptions() {
     `).join('');
 
     if (availablePrinters.length === 0) {
-        elements.printerSelect.innerHTML = '<option disabled>Nenhuma disponível</option>';
+        elements.printerSelect.innerHTML = '<option disabled>Nenhuma máq. liberada para este Setor</option>';
         elements.printerSelect.disabled = true;
-        elements.printerName.textContent = 'Nenhuma disponível';
+        elements.printerName.textContent = 'Não autorizada (Vá no Admin)';
     } else {
         elements.printerSelect.disabled = false;
         // Atualiza nome exibido no card

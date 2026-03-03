@@ -6,32 +6,27 @@ from app.constants import BASE_DIR, SECRET_KEY, PERMANENT_SESSION_LIFETIME
 from app.bootstrap import init_data_layout
 from app.services.logging_setup import setup_logging
 from app.services.log_service import init_loggers
-from app.services.auth_service import init_users_file
-from app.services.product_service import load_db_flor_from, load_db_flv_from
-from app.services.mapping_service import load_printer_map_from
-from app.routes.main import bp as main_bp
-from app.routes.admin import bp as admin_bp
-from app.routes.api import bp as api_bp
-from jinja2 import Environment, FileSystemLoader
+from app.controllers.auth_controller import bp as auth_bp
+from app.controllers.context_controller import bp as context_bp
+from app.controllers.print_controller import bp as print_bp
+from app.controllers.admin_controller import bp as admin_bp
+from app.controllers.stats_controller import bp as stats_bp
 from app.services.templates_service import criar_ambiente_zpl
+from app.services.auth_service import init_users_file
+from app.repositories.product_repository import load_db_flor_from, load_db_flv_from
+from app.repositories.printer_repository import load_printer_map_from
 
 # SSL / Warnings
 ssl._create_default_https_context = ssl._create_unverified_context
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# --- Paths de templates/estáticos + base para seeds ---
 if getattr(sys, "frozen", False):
     # Executável
     EXE_DIR = os.path.dirname(sys.executable)
-    TEMPLATE_DIR = os.path.join(EXE_DIR, "app", "templates")
-    STATIC_DIR   = os.path.join(EXE_DIR, "app", "static")
-    REPO_BASE    = os.path.join(EXE_DIR, "app")  # onde ficam zpl_templates/seeds no build
-    
+    REPO_BASE = os.path.join(EXE_DIR, "app")
 else:
     # Dev
-    TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
-    STATIC_DIR   = os.path.join(BASE_DIR, "static")
-    REPO_BASE    = BASE_DIR
+    REPO_BASE = BASE_DIR
 
 # --- ProgramData + semeadura de seeds/templates ---
 DIRS = init_data_layout(REPO_BASE)
@@ -45,7 +40,7 @@ init_loggers(
 )
 
 # --- Flask app ---
-app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR)
+app = Flask(__name__)
 app.secret_key = SECRET_KEY
 app.permanent_session_lifetime = PERMANENT_SESSION_LIFETIME
 
@@ -72,10 +67,12 @@ except Exception:
 # (Opcional) força leitura inicial de printers.csv só pra validar
 _ = load_printer_map_from(DIRS["data"])
 
-# Blueprints
-app.register_blueprint(main_bp)
+# Blueprints dos Controladores
+app.register_blueprint(auth_bp)
+app.register_blueprint(context_bp)
+app.register_blueprint(print_bp)
 app.register_blueprint(admin_bp)
-app.register_blueprint(api_bp)
+app.register_blueprint(stats_bp)
 
 # Serve arquivos do novo frontend (pasta frontend/)
 from flask import send_from_directory
@@ -93,11 +90,13 @@ def serve_frontend(filename):
 def serve_frontend_index():
     return send_from_directory(FRONTEND_DIR, "index.html")
 
-# Handler simples pra logar 500 com stack
+# Handler simples pra logar 500 com stack e devolver JSON
 @app.errorhandler(500)
 def _err500(e):
-    app.logger.exception("Erro 500 na requisição")
-    return "Erro interno. Consulte com o suporte ou TI de loja", 500
+    from app.services.log_service import log_exception
+    from flask import jsonify
+    log_exception("Erro 500 na requisição", erro=str(e))
+    return jsonify({"success": False, "error": "Erro interno. Consulte com o suporte ou TI de loja"}), 500
 
 if __name__ == "__main__" or __name__ == "app.__main__":
     if os.environ.get("IMPORT_ONLY"):

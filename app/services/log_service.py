@@ -18,9 +18,8 @@ def _with_request_context(data: dict) -> dict:
         data.setdefault("client_ip", request.remote_addr)
         data.setdefault("method", request.method)
         data.setdefault("path", request.path)
-        data.setdefault("user_agent",
-                        getattr(request, "user_agent", None)
-                        and request.user_agent.string)
+        user_agent_obj = getattr(request, "user_agent", None)
+        data.setdefault("user_agent", str(user_agent_obj) if user_agent_obj else None)
     return data
 
 
