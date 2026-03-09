@@ -27,13 +27,14 @@ if os.path.isdir(pywin32_system32):
 # Arquivos adicionais do projeto
 # -------------------------------------------------------------------
 includefiles = [
-    ("app/static", "app/static"),
-    ("app/templates", "app/templates"),
-    ("app/zpl_templates", "app/zpl_templates"),
+    ("app/controllers", "app/controllers"),
+    ("app/dtos", "app/dtos"),
+    ("app/mappers", "app/mappers"),
+    ("app/models", "app/models"),
+    ("app/repositories", "app/repositories"),
     ("app/seeds", "app/seeds"),
-    ("app/routes", "app/routes"),
     ("app/services", "app/services"),
-    ("app/printer_zq230.py", "app/printer_zq230.py"),
+    ("app/zpl_templates", "app/zpl_templates"),
     ("frontend", "frontend"),
 ]
 
