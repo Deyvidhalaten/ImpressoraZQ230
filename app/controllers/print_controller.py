@@ -1,5 +1,5 @@
 import fnmatch
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from flask import Blueprint, request, jsonify, current_app
 
 from app.repositories.printer_repository import load_printer_map_from
@@ -60,7 +60,7 @@ def print_label():
         return jsonify({"success": False, "error": "Loja não cadastrada"}), 404
 
     # Consulta produto
-    db = current_app.config["DB_FLV"] if dto.modo == "flv" else current_app.config["DB"]
+    db = current_app.config["DB_FLV"] if dto.modo == "flv" or "padaria" else current_app.config["DB"]
     try:
         rec = consulta_Base(dto.codigo, db)
         trace.add("consulta_db_result", found=bool(rec))
@@ -102,6 +102,10 @@ def print_label():
         if len(ean_raw) < 12:
             ean_final = ean_raw.zfill(12)
 
+    dias_para_adicionar = rec.get("validade")
+    data = date.today()
+    dataobj = data + timedelta(days=dias_para_adicionar)
+    dataValidade = dataobj.strftime("%d/%m/%Y")
     ctx = {
         "tipoean": tipoean,
         "modo": dto.modo,
@@ -114,6 +118,7 @@ def print_label():
         "validade": rec.get("validade"),
         "infnutri": nutri_list,
         "nutri": nutri_obj,
+        "dataValidade": dataValidade,
     }
 
     try:

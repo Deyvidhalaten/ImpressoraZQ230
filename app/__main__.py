@@ -1,5 +1,5 @@
 import os, sys, ssl, urllib3
-from flask import Flask
+from flask import Flask, jsonify
 from PIL import ImageFont
 
 from app.constants import BASE_DIR, SECRET_KEY, PERMANENT_SESSION_LIFETIME

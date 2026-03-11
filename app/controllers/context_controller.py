@@ -98,7 +98,7 @@ def search_products():
         return jsonify({"products": [], "error": "Query vazia"})
 
     # Seleciona a base de dados correta
-    db = current_app.config["DB_FLV"] if modo == "flv" else current_app.config["DB"]
+    db = current_app.config["DB_FLV"] if modo == "flv" or "padaria" else current_app.config["DB"]
     products = []
 
     if search_type == "descricao":
