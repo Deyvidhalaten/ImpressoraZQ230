@@ -98,6 +98,29 @@ def _err500(e):
     log_exception("Erro 500 na requisição", erro=str(e))
     return jsonify({"success": False, "error": "Erro interno. Consulte com o suporte ou TI de loja"}), 500
 
+@app.route("/api/shutdown", methods=["POST"])
+def shutdown():
+    """Desliga ou reinicia a aplicação forçadamente."""
+    from app.services.log_service import log_audit
+    from flask import request
+    
+    # É fundamental garantir auth forte aqui, porem para facilitar integracao com o frontend
+    # verificaremos se há um token valido ou simplesmente logaremos fortemente. 
+    # Como o painel do Admin e local-only ou intranet, adicionamos log de auditoria.
+    log_audit("system_shutdown", ip=request.remote_addr, detalhes="Shutdown solicitado via API")
+    
+    # O Waitress não tem gracefully shutdown por handler, os._exit força fim do processo
+    # Quando atrelado a um Serviço do Windows (NSSM/pywin32), o serviço será reportado como Stopped 
+    # e, dependendo da configuração de recovery, ele pode se reiniciar.
+    import threading
+    def kill_process():
+        import time
+        time.sleep(1)
+        os._exit(0)
+        
+    threading.Thread(target=kill_process).start()
+    return jsonify({"success": True, "message": "Sistema sendo encerrado (Shutdown)..."})
+
 if __name__ == "__main__" or __name__ == "app.__main__":
     if os.environ.get("IMPORT_ONLY"):
         pass

@@ -28,6 +28,25 @@ function handleAuthError(response) {
     }
     return false;
 }
+
+async function shutdownSystem() {
+    if (!confirm('ATENÇÃO: Isso desligará o serviço de impressão. Tem certeza absoluta?')) return;
+    try {
+        const response = await fetch(`${API_BASE}/shutdown`, {
+            method: 'POST',
+            headers: authHeaders
+        });
+        if (handleAuthError(response)) return;
+        const data = await response.json();
+        showToast('info', 'Encerrando', data.message || 'Desligando sistema...');
+        setTimeout(() => {
+            alert("Sistema foi desligado. Você precisará subí-lo manualmente ou via Serviço Windows.");
+            window.location.href = 'index.html'; // Tenta redirecionar
+        }, 3000);
+    } catch (e) {
+        showToast('error', 'Ops', 'Falha ao contatar servidor de desligamento.');
+    }
+}
 // -------------------------
 
 const state = {

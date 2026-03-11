@@ -1,34 +1,49 @@
-python setup.py build
-pip install pyinstaller
-py -m pip install Pillow
-pip install flask                     # web framework
-pip install requests                  # para chamadas HTTP (bwip-js)
-pip install cx_Freeze
-pip install windows-curses
-pip install waitress
+# -------------------------------------------------------------
+# DEPENDÊNCIAS DO PROJETO (Atualizadas em 2026)
+# -------------------------------------------------------------
+# Dependências principais usadas no código atual:
+pip install flask                     # Web framework (inclui werkzeug e itsdangerous)
+pip install waitress                  # Servidor WSGI para produção
+pip install pywin32                   # Comunicação nativa com a impressora no Windows
+pip install Pillow                    # Manipulação de imagens (PIL) para geração de ZPL
+pip install cx_Freeze                 # Empacota o app em executável Windows (.exe)
+pip install requests                  # Usado para testes unitários no projeto
+
+# Caso de erro ao instalar o waitress (pode ser a versão do python ou regra AD):
 pip install --no-binary :all: waitress
-Caso de erro ao instalar o :all waitress pode ser a versão do python ou regra AD, podes voltar para 
-o 3.11 ou rodar este: 
---------
-Para Rodar em modo DEBUG, precisa configurar antes, (Ctrl + Shifit + P) e escreva "Open launch.json" 
-Desta forma estara apotnando para a pasta correta e tenha o Python instalado no vscode
 
+# Dependências Antigas / Obsoletas (Podem ser ignoradas):
+# - pyinstaller (substituído pelo cx_Freeze)
+# - windows-curses (não é mais referenciado no código)
 
+# -------------------------------------------------------------
+# COMANDOS PARA RODAR O PROJETO
+# -------------------------------------------------------------
+# Rodar Localmente em modo de desenvolvimento:
+python app.py
 
-waitress-serve --listen=10.17.30.2:8000 app:app          #Rodar Servidor em LAN
+# Rodar Servidor em LAN (Produção):
+waitress-serve --listen=10.17.30.2:8000 app:app
 
-python app.py  # Roda Localmente, mas precisa das dependencias acima
+# -------------------------------------------------------------
+# GERAÇÃO DO EXECUTÁVEL (BUILD)
+# -------------------------------------------------------------
+python setup.py build
 
-Salvar Certificado caso de erro SLL 
+# -------------------------------------------------------------
+# SOLUÇÕES DE PROBLEMAS E UTIILITÁRIOS
+# -------------------------------------------------------------
+# Salvar Certificado caso de erro SSL (Rede Corporativa / AD)
 setx PIP_CERT "C:\certs\corp-root.pem"
 setx REQUESTS_CA_BUNDLE "C:\certs\corp-root.pem"
 setx SSL_CERT_FILE "C:\certs\corp-root.pem"
 
-Instalar Dependencia -> pip install pyinstaller
-Executar no CMD para gerar um executavel Criptografado ->  pyinstaller ImpressoraApp.spec
- pyinstaller --onefile --name ImpressoraApp app.py
-
- Limpar cache
-
- python -m compileall -b .
+# Limpar cache do Python (__pycache__)
+python -m compileall -b .
 for /r %i in (__pycache__) do rmdir /s /q "%i"
+
+# -------------------------------------------------------------
+# MODO DEBUG (VSCode)
+# -------------------------------------------------------------
+# Para rodar em modo DEBUG, configure o VSCode: (Ctrl + Shift + P) e escreva "Open launch.json"
+# Desta forma o debug estará apontando para a pasta correta.
