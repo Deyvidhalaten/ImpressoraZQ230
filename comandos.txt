@@ -8,6 +8,10 @@ pip install pywin32                   # Comunicação nativa com a impressora no
 pip install Pillow                    # Manipulação de imagens (PIL) para geração de ZPL
 pip install cx_Freeze                 # Empacota o app em executável Windows (.exe)
 pip install requests                  # Usado para testes unitários no projeto
+pip install aiohttp                   # 
+pip install cryptography
+pip install pydantic
+pip install "flask[async]"
 
 # Caso de erro ao instalar o waitress (pode ser a versão do python ou regra AD):
 pip install --no-binary :all: waitress
