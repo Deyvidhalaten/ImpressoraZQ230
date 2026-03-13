@@ -4,6 +4,5 @@
         "**/*.pyc": true,
         "**/__pycache__": true,
         "**/__init__.py": true,
-        "**/.env": true
     }
 }

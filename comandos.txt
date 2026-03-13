@@ -9,10 +9,11 @@ pip install Pillow                    # Manipulação de imagens (PIL) para gera
 pip install cx_Freeze                 # Empacota o app em executável Windows (.exe)
 pip install requests                  # Usado para testes unitários no projeto
 pip install aiohttp                   # 
-pip install cryptography
+pip install cryptography==45.0.6
 pip install pydantic
 pip install "flask[async]"
 pip install python-dotenv
+pip install oauthlib==3.3.1
 
 # Caso de erro ao instalar o waitress (pode ser a versão do python ou regra AD):
 pip install --no-binary :all: waitress

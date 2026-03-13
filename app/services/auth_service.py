@@ -106,14 +106,11 @@ def require_admin_nivel(min_nivel: int):
 
 
 import os
-BAPI = os.environ.get("BSTK_BAPI", "https://api.bistek.com.br")
-
-# A validação local da API Bistek com o HEADERS removido a pedido do dev
-# TOKEN_AD fica reservado para outros testes caso seja necessário depois
-def get_ad_headers() -> dict:
-    return {
-        "Content-Type": "application/json",
-    }
+BAPI = "https://api.bistek.com.br" # environ["BSTK_BAPI"]
+HEADERS = {
+    "Authorization": f"Bearer {TOKEN}",
+    "Content-Type": "application/json",
+}
 
 class Autenticado(BaseModel):
     sucesso: bool = False
@@ -122,8 +119,9 @@ class Autenticado(BaseModel):
 
 
 async def patch_bapi_autenticador(envio: dict) -> Autenticado:
-    # O dev da API da Bistek não permite a injeção do HEADER de Bearer padrão
-    # Este trecho envia EXATAMENTE os dados criptografados e lida com o token JWT que será assinado depois.
+    if not TOKEN:
+        return Autenticado(mensagem="Token não informado")
+
     async with ClientSession() as s:
         async with s.patch(f"{BAPI}/ad/autenticacao", json=envio, ssl=False) as r:
             retorno = {"ok": False}
