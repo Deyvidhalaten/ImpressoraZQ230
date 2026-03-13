@@ -27,24 +27,17 @@ def context():
     is_localhost = client_ip in ("127.0.0.1", "::1", "localhost")
     is_test = is_test_config or is_localhost
 
+    # Override de IP em modo teste
+    if is_test:
+        client_ip = "10.17.30.2"
+
     # Identificação da loja
     loja_map = next((p for p in mappings if fnmatch.fnmatch(client_ip, p["pattern"])), None)
     
     # Modos válidos (baseado em todos os templates existentes no backend)
     valid_modes = list_templates_by_mode(templates_dir).keys()
 
-    # MODO TESTE: Se não encontrou loja e modo teste está ativo, usa loja fake
-    if not loja_map and is_test:
-        loja_map = {
-            "loja": "9999",
-            "pattern": "*",
-            "nome": "Impressora Teste",
-            "ip": "127.0.0.1",
-            "funcao": list(valid_modes),
-            "ls": {k: 0 for k in valid_modes},
-        }
-        printers = [loja_map]
-    elif not loja_map:
+    if not loja_map:
         return jsonify({"error": "Loja não cadastrada", "client_ip": client_ip}), 404
     else:
         printers = [p for p in mappings if p["loja"] == loja_map["loja"]]

@@ -596,6 +596,20 @@ body {
    Admin Styles
    ============================================ */
 
+.admin-view {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+
+.admin-view.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 .admin-section {
     margin-bottom: var(--space-2xl);
 }

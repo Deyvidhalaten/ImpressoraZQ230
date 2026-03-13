@@ -44,30 +44,8 @@ def load_printer_map_from(data_dir: Optional[Path] = None) -> List[Dict]:
     valid_modes = _get_valid_modes_from_templates(data_dir)
 
     if not json_path.exists() and csv_path.exists():
-        import csv
         from app.services.log_service import log_error
-        try:
-            with csv_path.open(newline='', encoding='utf-8') as f:
-                for row in csv.DictReader(f):
-                    raw_func = (row.get('funcao') or '').strip()
-                    funcs = [x.strip().lower() for x in raw_func.split(';') if x.strip()]
-                    funcs_validas = [f for f in funcs if f in valid_modes] or funcs
-                    
-                    maps.append({
-                        'loja': str(row.get('loja', '')).strip(),
-                        'pattern': str(row.get('pattern', '')).strip(),
-                        'nome': (row.get('nome') or '').strip(),
-                        'ip': (row.get('ip') or '').strip(),
-                        'funcao': funcs_validas,
-                        'ls': {
-                            'floricultura': int(row.get('ls_flor', 0) or 0),
-                            'flv': int(row.get('ls_flv', 0) or 0),
-                        }
-                    })
-            save_printer_map_to(data_dir, maps)
-            return maps
-        except Exception as e:
-            log_error("Erro Migração CSV", erro=f"Falha ao tentar converter o CSV antigo para o novo formato JSON: {e}")
+        log_error("Aviso Migração", erro="A geração via CSV legado foi desativada. Exclua a pasta data para recriar o JSON puro ou cadastre impressoras no Admin Nível 2.")
 
     if not json_path.exists():
         return maps
@@ -78,48 +56,96 @@ def load_printer_map_from(data_dir: Optional[Path] = None) -> List[Dict]:
         with json_path.open('r', encoding='utf-8') as f:
             data = json.load(f)
             
-            if not isinstance(data, list):
-                log_error("Erro Estrutura", erro="printers.json não contém uma lista válida.")
+            # Formato Hierárquico: Funcao -> Lojas -> Object { impressoras: [...] }
+            # Precisamos 'achatar' (flatten) isso para os Controladores do Backend
+            if not isinstance(data, dict):
+                log_error("Erro Estrutura", erro="printers.json deve ser um dicionário hierárquico (Função -> Lojas).")
                 return maps
-                
-            for item in data:
-                if not isinstance(item, dict):
+            
+            # Rastreador de impressoras únicas (usando IP como chave primária)
+            printers_by_ip = {}
+            
+            for funcao, blocos_loja in data.items():
+                if funcao not in valid_modes:
                     continue
                     
-                if 'ls' not in item or not isinstance(item['ls'], dict):
-                    item['ls'] = {}
+                lojas = blocos_loja.get("lojas", {})
+                for codigo_loja, loja_info in lojas.items():
+                    impressoras = loja_info.get("impressoras", [])
                     
-                if 'ls_flor' in item and 'floricultura' not in item['ls']:
-                    item['ls']['floricultura'] = item.pop('ls_flor', 0)
-                if 'ls_flv' in item and 'flv' not in item['ls']:
-                    item['ls']['flv'] = item.pop('ls_flv', 0)
-                    
-                funcs = item.get('funcao', [])
-                if isinstance(funcs, str):
-                    funcs = [x.strip().lower() for x in funcs.split(';') if x.strip()]
-                item['funcao'] = [f for f in funcs if f in valid_modes] or funcs
+                    for imp in impressoras:
+                        ip = imp.get("ip")
+                        if not ip: continue
+                        
+                        if ip not in printers_by_ip:
+                            # Cria o modelo flatten baseado na primeira vez que vê ela
+                            printers_by_ip[ip] = {
+                                "loja": codigo_loja,
+                                "pattern": imp.get("pattern", f"10.{int(codigo_loja)}.*" if codigo_loja.isdigit() else "*"),
+                                "nome": imp.get("nome", ""),
+                                "ip": ip,
+                                "funcao": set(),
+                                "ls": {}
+                            }
+                        
+                        # Adiciona a função
+                        printers_by_ip[ip]["funcao"].add(funcao)
+                        
+                        # Registra o Limit Switch específico desta função caso exista
+                        if "ls" in imp:
+                            printers_by_ip[ip]["ls"][funcao] = imp["ls"]
+
+            # Converte a estrutura achatada para a lista esperada
+            for ip, p in printers_by_ip.items():
+                p["funcao"] = list(p["funcao"])  # set para list
+                maps.append(p)
                 
-                maps.append(item)
     except json.JSONDecodeError as e:
-        log_error("Erro JSON", erro=f"O arquivo printers.json está corrompido ou mal formatado. O sistema usará uma lista vazia. Erro: {e}")
+        log_error("Erro JSON", erro=f"O arquivo printers.json está corrompido ou mal formatado. A lista será retornada vazia. Erro: {e}")
     except Exception as e:
-        log_error("Erro Leitura", erro=f"Falha inesperada ao ler printers.json: {e}")
+        log_error("Erro Leitura", erro=f"Falha inesperada ao ler a hierarquia printers.json: {e}")
 
     return maps
 
 
-def save_printer_map_to(data_dir: Optional[Path], mappings):
-    """Salva o mapeamento de impressoras em printers.json."""
+def save_printer_map_to(data_dir: Optional[Path], flat_mappings: List[Dict]):
+    """Salva a lista achadada de mapeamentos convertendo-a devolta para a Hierarquia Função -> Loja"""
     data_dir = _resolve_data_dir(data_dir)
     json_path = data_dir / "printers.json"
     
+    hierarquia = {}
+    
+    for printer in flat_mappings:
+        loja = printer.get("loja", "")
+        if not loja: continue
+            
+        funcoes = printer.get("funcao", [])
+        
+        for funcao in funcoes:
+            if funcao not in hierarquia:
+                hierarquia[funcao] = {"lojas": {}}
+                
+            if loja not in hierarquia[funcao]["lojas"]:
+                hierarquia[funcao]["lojas"][loja] = {"impressoras": []}
+                
+            # O limit switch no modelo hierárquico é um número simples embaixo da impressora
+            # Mapeado a partir do dicionário de "ls" no flat model
+            ls_value = printer.get("ls", {}).get(funcao, 0)
+            
+            hierarquia[funcao]["lojas"][loja]["impressoras"].append({
+                "nome": printer.get("nome", ""),
+                "ip": printer.get("ip", ""),
+                "pattern": printer.get("pattern", f"10.{int(loja)}.*" if str(loja).isdigit() else "*"),
+                "ls": ls_value
+            })
+
     import json
     from app.services.log_service import log_error
     try:
         with json_path.open('w', encoding='utf-8') as f:
-            json.dump(mappings, f, indent=4, ensure_ascii=False)
+            json.dump(hierarquia, f, indent=4, ensure_ascii=False)
     except Exception as e:
-        log_error("Erro Escrita", erro=f"Falha ao salvar modificações no printers.json: {e}")
+        log_error("Erro Escrita", erro=f"Falha ao salvar modificações hierárquicas no printers.json: {e}")
 
 
 # Aliases de compatibilidade

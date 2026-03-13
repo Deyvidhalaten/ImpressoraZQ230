@@ -15,6 +15,46 @@ if (!token) {
     window.location.href = 'login.html';
 }
 
+function parseJwt(token) {
+    try {
+        // itsdangerous usa o payload base64 no índice 0 (Token gerado pelo Flask/auth_service)
+        const base64Url = token.split('.')[0];
+        let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        
+        // Adicionando padding obrigatório para o atob() do Javascript funcionar
+        while (base64.length % 4) {
+            base64 += '=';
+        }
+
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(jsonPayload);
+    } catch (e) {
+        return null;
+    }
+}
+
+const currentUser = parseJwt(token);
+if (!currentUser) {
+    localStorage.removeItem('adminToken');
+    window.location.href = 'login.html';
+}
+
+const currentUserLevel = parseInt(currentUser.nivel) || 1;
+document.getElementById('userLevelBadge').textContent = currentUserLevel;
+
+// Exibir abas apenas se permitido
+if (currentUserLevel >= 2) {
+    document.getElementById('tabUsers').style.display = 'inline-block';
+    document.getElementById('addPrinterSectionContainer').style.display = 'block';
+    document.getElementById('configLsSection').style.display = 'block';
+}
+if (currentUserLevel >= 3) {
+    document.getElementById('tabTemplates').style.display = 'inline-block';
+    document.getElementById('optNivel3').style.display = 'block';
+}
+
 const authHeaders = {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`
@@ -53,7 +93,11 @@ const state = {
     loja: null,
     printers: [],
     allPrinters: [],
-    selectedPrinter: null
+    selectedPrinter: null,
+    modos: [],
+    users: {},
+    templates: {},
+    currentTemplate: null
 };
 
 const elements = {
@@ -65,8 +109,48 @@ const elements = {
     newFuncaoSelect: document.getElementById('newFuncao'),
     newLsInputsContainer: document.getElementById('newLsInputsContainer'),
     toastContainer: document.getElementById('toastContainer'),
-    editFuncaoSelect: document.getElementById('editFuncao')
+    editFuncaoSelect: document.getElementById('editFuncao'),
+    tabBtns: document.querySelectorAll('.tab-btn'),
+    adminViews: document.querySelectorAll('.admin-view'),
+    
+    // Nivel 2: Users
+    usersTableBody: document.getElementById('usersTableBody'),
+    addUserForm: document.getElementById('addUserForm'),
+    
+    // Nivel 3: Templates
+    templatesList: document.getElementById('templatesList'),
+    tplFilename: document.getElementById('tplFilename'),
+    tplContent: document.getElementById('tplContent'),
+    btnSaveTemplate: document.getElementById('btnSaveTemplate'),
+    btnDeleteTemplate: document.getElementById('btnDeleteTemplate'),
+    btnNewTemplate: document.getElementById('btnNewTemplate')
 };
+
+// Aba de Navegação
+elements.tabBtns.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        elements.tabBtns.forEach(b => b.classList.remove('active'));
+        elements.adminViews.forEach(v => v.classList.remove('active'));
+        
+        const targetId = e.currentTarget.getAttribute('data-target');
+        e.currentTarget.classList.add('active');
+        document.getElementById(targetId).classList.add('active');
+        
+        // Lazy load modules se a aba for clicada
+        if(targetId === 'usersSection' && Object.keys(state.users).length === 0) fetchUsers();
+        if(targetId === 'templatesSection' && Object.keys(state.templates).length === 0) fetchTemplates();
+    });
+});
+
+// Modals
+document.getElementById('btnOpenAddPrinterModal')?.addEventListener('click', () => {
+    document.getElementById('addPrinterModal').classList.add('active');
+});
+document.getElementById('btnOpenAddUserModal')?.addEventListener('click', () => {
+    document.getElementById('addUserForm').reset();
+    document.getElementById('newUsername').readOnly = false;
+    document.getElementById('addUserModal').classList.add('active');
+});
 
 // Toast
 function showToast(type, title, message) {
@@ -127,7 +211,8 @@ function renderNewFuncaoOptions() {
 // Fetch all printers (admin only)
 async function fetchAllPrinters() {
     try {
-        const response = await fetch(`${API_BASE}/printers`);
+        const response = await fetch(`${API_BASE}/printers`, { headers: authHeaders });
+        if (handleAuthError(response)) return;
         if (response.ok) {
             state.allPrinters = await response.json();
             if (state.modos) { // Só renderiza a tabela se modos já estiver populado
@@ -350,14 +435,186 @@ async function deletePrinter(ip, pattern) {
     }
 }
 
+// Nivel 2: Users Logic
+
+async function fetchUsers() {
+    if (currentUserLevel < 2) return;
+    try {
+        const response = await fetch(`${API_BASE}/users`, { headers: authHeaders });
+        if (handleAuthError(response)) return;
+        state.users = await response.json();
+        renderUsersTable();
+    } catch (e) {
+        showToast('error', 'Erro', 'Falha ao buscar usuários');
+    }
+}
+
+function renderUsersTable() {
+    elements.usersTableBody.innerHTML = Object.keys(state.users).map(username => {
+        const u = state.users[username];
+        const isSelf = username === currentUser.user;
+        const disabled = (u.nivel === 3 && currentUserLevel < 3) ? 'disabled' : '';
+        const levelText = u.nivel === 3 ? '<span style="color:var(--danger-color);font-weight:bold;">3 - Global</span>' : u.nivel;
+        
+        let lojasDisplay = (u.lojas || []).join(', ');
+        if (lojasDisplay.includes('*')) {
+            lojasDisplay = 'TODAS (Global)';
+        } else if (!lojasDisplay && u.nivel === 3) {
+            lojasDisplay = 'TODAS (Global)';
+        } else if (!lojasDisplay) {
+            lojasDisplay = '--';
+        }
+        
+        return `
+        <tr>
+            <td>${username} ${isSelf ? ' <span style="font-size:0.8em;color:gray;">(Você)</span>' : ''}</td>
+            <td>${levelText}</td>
+            <td>${lojasDisplay}</td>
+            <td>
+                <button class="btn btn-small btn-secondary" onclick="editUser('${username}')" ${disabled}>✏️ Edita</button>
+                <button class="btn btn-small btn-danger" onclick="deleteUser('${username}')" ${disabled || isSelf ? 'disabled' : ''}>🗑️</button>
+            </td>
+        </tr>
+    `}).join('');
+}
+
+window.editUser = function(username) {
+    const u = state.users[username];
+    if(!u) return;
+    document.getElementById('newUsername').value = username;
+    document.getElementById('newUsername').readOnly = true;
+    document.getElementById('newUserLevel').value = u.nivel;
+    document.getElementById('newUserLojas').value = (u.lojas || []).join(', ');
+    document.getElementById('addUserModal').classList.add('active');
+};
+
+window.deleteUser = async function(username) {
+    if (!confirm(`Remover ACESSO do admin ${username}?`)) return;
+    try {
+        const res = await fetch(`${API_BASE}/users/${username}`, { method: 'DELETE', headers: authHeaders });
+        const data = await res.json();
+        if(data.success) {
+            showToast('success', 'Deletado', 'Usuário removido com sucesso.');
+            fetchUsers();
+        } else showToast('error', 'Erro', data.error);
+    } catch(e) { showToast('error', 'Erro', 'Falha de rede.');}
+};
+
+elements.addUserForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const lojasRaw = document.getElementById('newUserLojas').value.split(',').map(x => x.trim()).filter(x => x !== '');
+    const userPayload = {
+        username: document.getElementById('newUsername').value,
+        nivel: document.getElementById('newUserLevel').value,
+        lojas: lojasRaw
+    };
+    try {
+        const res = await fetch(`${API_BASE}/users`, {
+            method: 'POST',
+            headers: authHeaders,
+            body: JSON.stringify(userPayload)
+        });
+        const data = await res.json();
+        if(data.success) {
+            showToast('success', 'Salvo', 'Usuário salvo com sucesso.');
+            document.getElementById('addUserModal').classList.remove('active');
+            fetchUsers();
+        } else showToast('error', 'Erro', data.error);
+    } catch(e) { showToast('error', 'Erro', 'Falha de rede.');}
+});
+
+
+// Nivel 3: Templates ZPL
+async function fetchTemplates() {
+    if (currentUserLevel < 3) return;
+    try {
+        const response = await fetch(`${API_BASE}/templates`, { headers: authHeaders });
+        if (handleAuthError(response)) return;
+        state.templates = await response.json();
+        renderTemplatesList();
+    } catch (e) {
+        showToast('error', 'Erro', 'Falha ao buscar gabaritos ZPL');
+    }
+}
+
+function renderTemplatesList() {
+    const keys = Object.keys(state.templates).sort();
+    elements.templatesList.innerHTML = keys.map(name => `
+        <li>
+            <a href="#" class="nav-link" style="display:block; padding: 0.5rem; border-radius: 4px; background: ${state.currentTemplate === name ? 'var(--primary-color)' : '#f0f0f0'}; color: ${state.currentTemplate === name ? 'white' : 'black'}; text-decoration:none;" onclick="loadTemplateEditor('${name}')">
+                📄 ${name}
+            </a>
+        </li>
+    `).join('');
+    
+    if (keys.length > 0 && !state.currentTemplate) {
+        loadTemplateEditor(keys[0]);
+    } else if (keys.length === 0){
+        elements.tplFilename.value = '';
+        elements.tplContent.value = '';
+        elements.btnDeleteTemplate.style.display = 'none';
+    }
+}
+
+window.loadTemplateEditor = function(filename) {
+    state.currentTemplate = filename;
+    elements.tplFilename.value = filename;
+    elements.tplContent.value = state.templates[filename];
+    elements.btnDeleteTemplate.style.display = 'inline-block';
+    renderTemplatesList(); // re-draw colors
+};
+
+elements.btnNewTemplate?.addEventListener('click', () => {
+    state.currentTemplate = null;
+    elements.tplFilename.value = 'novo_modal.zpl.j2';
+    elements.tplContent.value = '^XA\n// Digite seu ZPL Jinja aqui\n^XZ';
+    elements.btnDeleteTemplate.style.display = 'none';
+    renderTemplatesList();
+});
+
+elements.btnSaveTemplate?.addEventListener('click', async () => {
+    const filename = elements.tplFilename.value.trim();
+    if (!filename) return showToast('error', 'Erro', 'Dê um nome ao arquivo (ex: funcao.zpl.j2)');
+    try {
+        const res = await fetch(`${API_BASE}/templates`, {
+            method: 'POST',
+            headers: authHeaders,
+            body: JSON.stringify({ filename, content: elements.tplContent.value })
+        });
+        const data = await res.json();
+        if(data.success) {
+            showToast('success', 'Salvo', `Gabarito ${filename} salvo.`);
+            await fetchTemplates();
+            loadTemplateEditor(data.filename); // reload c/ nome correto (se adicionou a .j2 extensão)
+        } else showToast('error', 'Erro', data.error);
+    } catch(e) { showToast('error', 'Erro', 'Falha de rede.');}
+});
+
+elements.btnDeleteTemplate?.addEventListener('click', async () => {
+    const filename = state.currentTemplate;
+    if (!filename) return;
+    if (!confirm(`Certeza ABSOLUTA que deseja remover o gabarito ${filename}? Isso afetará as impressões dessa função!`)) return;
+    try {
+        const res = await fetch(`${API_BASE}/templates/${filename}`, { method: 'DELETE', headers: authHeaders });
+        const data = await res.json();
+        if(data.success) {
+            showToast('success', 'Removido', `Gabarito ${filename} excluído.`);
+            state.currentTemplate = null;
+            await fetchTemplates();
+        } else showToast('error', 'Erro', data.error);
+    } catch(e) { showToast('error', 'Erro', 'Falha ao remover o template.');}
+});
+
 // Init
 document.addEventListener('DOMContentLoaded', async () => {
     try {
         // Garante primeiro o carregamento de context (loja, modos)
         await fetchContext();
-        // Em seguida roda o getAll para não quebrar tabelas
-        await fetchAllPrinters();
+        // Em seguida roda o getAll para não quebrar tabelas se Nivel >= 2
+        if(currentUserLevel >= 1) { // 1 só ve as do context, >= 2 getAll
+            await fetchAllPrinters();
+        }
     } catch (err) {
-        alert("Erro fatal na inicialização do Admin: " + err.message + "\nStack: " + err.stack);
+        console.error("Erro na inicialização do Admin: ", err);
     }
 });

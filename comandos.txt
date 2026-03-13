@@ -12,6 +12,7 @@ pip install aiohttp                   #
 pip install cryptography
 pip install pydantic
 pip install "flask[async]"
+pip install python-dotenv
 
 # Caso de erro ao instalar o waitress (pode ser a versão do python ou regra AD):
 pip install --no-binary :all: waitress

@@ -11,6 +11,10 @@ from flask import current_app, request, jsonify
 from functools import wraps
 from cryptography.fernet import Fernet 
 
+from dotenv import load_dotenv
+
+load_dotenv()  # Carrega variaveis do .env local se existir
+
 def get_users_file() -> Path:
     return current_app.config["DIRS"]["data"] / "users.json"
 
@@ -18,33 +22,38 @@ def init_users_file(data_dir: Path):
     users_file = data_dir / "users.json"
     if not users_file.exists():
         users_file.parent.mkdir(parents=True, exist_ok=True)
-        # default user: admin, senha: 123
-        # Mudar isso na UI mais tarde
+        # default user: admin, nivel 3 (max), com acesso global representado por '*'
         default_user = {
-            "deyvid.silva": "2"
+            "deyvid.silva": {
+                "nivel": 3,
+                "lojas": ["*"]
+            },
+            "fabiano.bertoti": {
+                "nivel": 3,
+                "lojas": ["*"]
+            }
         }
         with users_file.open("w", encoding="utf-8") as f:
             json.dump(default_user, f, indent=4)
 
-def check_login(username, password) -> bool:
+def get_user_data(username: str) -> dict:
     users_file = get_users_file()
     if not users_file.exists():
-        return False
+        return None
     try:
         with users_file.open("r", encoding="utf-8") as f:
             users = json.load(f)
+            return users.get(username)
     except Exception:
-        return False
-        
-    hashed_pwd = users.get(username)
-    if not hashed_pwd:
-        return False
-        
-    return check_password_hash(hashed_pwd, password)
+        return None
+
 
 def generate_auth_token(username: str) -> str:
     s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
-    return s.dumps({"user": username}, salt="admin-auth")
+    user_data = get_user_data(username)
+    nivel = user_data.get("nivel", 1) if user_data else 1
+    lojas = user_data.get("lojas", []) if user_data else []
+    return s.dumps({"user": username, "nivel": nivel, "lojas": lojas}, salt="admin-auth")
 
 def verify_auth_token(token: str, max_age=86400): # 1 dia
     s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
@@ -52,7 +61,7 @@ def verify_auth_token(token: str, max_age=86400): # 1 dia
         data = s.loads(token, salt="admin-auth", max_age=max_age)
     except (SignatureExpired, BadSignature):
         return None
-    return data["user"]
+    return data
 
 def require_auth(f):
     @wraps(f)
@@ -65,20 +74,46 @@ def require_auth(f):
             return jsonify({"success": False, "error": "Autenticação requerida"}), 401
             
         token = auth_header.split(" ")[1]
-        user = verify_auth_token(token)
-        if not user:
+        user_data = verify_auth_token(token)
+        if not user_data or "user" not in user_data:
             return jsonify({"success": False, "error": "Token inválido ou expirado"}), 401
             
         return f(*args, **kwargs)
     return decorated
 
+def require_admin_nivel(min_nivel: int):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if request.method == "OPTIONS":
+                return f(*args, **kwargs)
+                
+            auth_header = request.headers.get("Authorization")
+            if not auth_header or not auth_header.startswith("Bearer "):
+                return jsonify({"success": False, "error": "Autenticação requerida"}), 401
+                
+            token = auth_header.split(" ")[1]
+            user_data = verify_auth_token(token)
+            if not user_data or "user" not in user_data:
+                return jsonify({"success": False, "error": "Token inválido ou expirado"}), 401
+                
+            if user_data.get("nivel", 1) < min_nivel:
+                return jsonify({"success": False, "error": "Acesso negado: Nível de administrador insuficiente"}), 403
+                
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
 
-BAPI = "https://api.bistek.com.br" # environ["BSTK_BAPI"]
-TOKEN = "eyJ0eXAiOiAiSldUIiwgImFsZyI6ICJIUzI1NiJ9.eyJ1c3VhcmlvIjogImRleXZpZC5zaWx2YSIsICJzZW5oYSI6ICI1Rm4wTipOUCIsICJ0aW1lb3V0IjogMjA4ODY4MTcxMi44Mjk2NTR9.nSqkYEARLEVhKxmnNIPWnoskS-FwN5JqkCYTIAN-Nlk=" # environ["TOKEN_AD"]
-HEADERS = {
-    "Authorization": f"Bearer {TOKEN}",
-    "Content-Type": "application/json",
-}
+
+import os
+BAPI = os.environ.get("BSTK_BAPI", "https://api.bistek.com.br")
+
+# A validação local da API Bistek com o HEADERS removido a pedido do dev
+# TOKEN_AD fica reservado para outros testes caso seja necessário depois
+def get_ad_headers() -> dict:
+    return {
+        "Content-Type": "application/json",
+    }
 
 class Autenticado(BaseModel):
     sucesso: bool = False
@@ -87,10 +122,9 @@ class Autenticado(BaseModel):
 
 
 async def patch_bapi_autenticador(envio: dict) -> Autenticado:
-    if not TOKEN:
-        return Autenticado(mensagem="Token não informado")
-
-    async with ClientSession(headers=HEADERS) as s:
+    # O dev da API da Bistek não permite a injeção do HEADER de Bearer padrão
+    # Este trecho envia EXATAMENTE os dados criptografados e lida com o token JWT que será assinado depois.
+    async with ClientSession() as s:
         async with s.patch(f"{BAPI}/ad/autenticacao", json=envio, ssl=False) as r:
             retorno = {"ok": False}
             if r.status in(200, 400, 401):
@@ -131,7 +165,8 @@ async def realizar_login_ad(usuario: str, senha: str) -> Autenticado:
         envio = {"data": dado, "secret": segredo[0]}
         return await patch_bapi_autenticador(envio)
     except Exception as e:
-        return Autenticado(mensagem=str(e))
+        print(f"[Erro Login AD] Falha na comunicação: {str(e)}")
+        return Autenticado(mensagem="Informações inválidas ou usuário não cadastrado.")
 
 
 def isWindows() -> bool:
