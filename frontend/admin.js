@@ -117,7 +117,7 @@ const elements = {
     
     // Novo: Bind Function ZPL
     bindFunctionForm: document.getElementById('bindFunctionForm'),
-    bindPrinterSelect: document.getElementById('bindPrinterSelect'),
+    bindPrintersList: document.getElementById('bindPrintersList'),
     bindFuncaoSelect: document.getElementById('bindFuncaoSelect'),
     
     // Nivel 3: Templates
@@ -335,29 +335,30 @@ function renderPrintersTable() {
     const printers = state.allPrinters.length > 0 ? state.allPrinters : state.printers;
 
     // Popula dropdown de vinculo de funcoes
-    if (elements.bindPrinterSelect) {
-        elements.bindPrinterSelect.innerHTML = printers.map(p => 
-            `<option value="${p.ip}">${p.nome || p.ip} (Loja ${p.loja || '--'})</option>`
+    if (elements.bindPrintersList) {
+        elements.bindPrintersList.innerHTML = printers.map(p => 
+            `<label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.2rem; border-radius: 4px; transition: background 0.2s;">
+                <input type="checkbox" value="${p.ip}" class="printer-bind-cb" style="cursor: pointer; transform: scale(1.2);">
+                ${p.nome || p.ip} (Loja ${p.loja || '--'})
+            </label>`
         ).join('');
         
         elements.bindFuncaoSelect.innerHTML = state.modos.map(m =>
             `<option value="${m.key}">${m.label}</option>`
         ).join('');
 
-        // Pre-seleciona as funcoes corretas quando muda a impressora selecionada
-        elements.bindPrinterSelect.addEventListener('change', () => {
-            const selectedIp = elements.bindPrinterSelect.value;
-            const printerObj = printers.find(p => p.ip === selectedIp);
-            if(printerObj) {
-                const funcs = printerObj.funcao || [];
-                Array.from(elements.bindFuncaoSelect.options).forEach(opt => {
-                    opt.selected = funcs.includes(opt.value);
-                });
-            }
+        // Quando trocar a função (A esquerda), marca na lista da direita QUAIS impressoras já tem ela
+        elements.bindFuncaoSelect.addEventListener('change', () => {
+            const selectedFunc = elements.bindFuncaoSelect.value;
+            elements.bindPrintersList.querySelectorAll('.printer-bind-cb').forEach(cb => {
+                const printerObj = printers.find(p => p.ip === cb.value);
+                const hasFunc = printerObj && printerObj.funcao && printerObj.funcao.includes(selectedFunc);
+                cb.checked = hasFunc;
+            });
         });
         
-        // Dispara o evento de mudanca inicial para preencher o state do primeiro cara da lista
-        elements.bindPrinterSelect.dispatchEvent(new Event('change'));
+        // Dispara logo no inicio pro primeiro da lista
+        elements.bindFuncaoSelect.dispatchEvent(new Event('change'));
     }
 
     elements.printersTableBody.innerHTML = printers.map(p => {
@@ -495,43 +496,58 @@ async function deletePrinter(ip, pattern) {
     }
 }
 
-// Vinculo de Function a Imrpessora (Nivel 2)
+// Vinculo de Function a Impressoras (Invertido - Nivel 2)
 elements.bindFunctionForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
     
-    const selectedIp = elements.bindPrinterSelect.value;
-    if (!selectedIp) return;
+    const targetFunc = elements.bindFuncaoSelect.value;
+    if (!targetFunc) return;
     
-    // Pega os LS antigos pra manter intactos
+    // Lista de IPs selecionados na caixa p/ receber essa funcao
+    const selectedIps = Array.from(elements.bindPrintersList.querySelectorAll('.printer-bind-cb:checked')).map(cb => cb.value);
+    
     const printers = state.allPrinters.length > 0 ? state.allPrinters : state.printers;
-    const printerObj = printers.find(p => p.ip === selectedIp);
-    if (!printerObj) return;
-    
-    const novasFuncoes = Array.from(elements.bindFuncaoSelect.selectedOptions).map(opt => opt.value);
-    
-    try {
-        const response = await fetch(`${API_BASE}/printers/ls`, {
-            method: 'PUT',
-            headers: authHeaders,
-            body: JSON.stringify({
-                loja: printerObj.loja || state.loja,
-                ip: printerObj.ip,
-                ls: printerObj.ls || {},
-                funcao: novasFuncoes
-            })
-        });
+    const promises = [];
 
-        if (handleAuthError(response)) return;
-        const data = await response.json();
-
-        if (data.success) {
-            showToast('success', 'Salvo!', 'Vínculo de funções atualizado.');
-            fetchAllPrinters(); // Atualiza backend state
-        } else {
-            showToast('error', 'Erro', data.error || 'Falha ao vincular');
+    // Avalia todas as impressoras da lista (inclusive pra 'desmarcar' funcoes removidas)
+    // Para simplificar, o escopo se limita aos checkboxes renderizados no HTML pro nivel dele
+    const availablePrinterIps = Array.from(elements.bindPrintersList.querySelectorAll('.printer-bind-cb')).map(cb => cb.value);
+    
+    for (const p of printers) {
+        if (!availablePrinterIps.includes(p.ip)) continue; // Ignora as q ele nem enxerga
+        
+        const isSelectedToHave = selectedIps.includes(p.ip);
+        const alreadyHas = p.funcao && p.funcao.includes(targetFunc);
+        
+        // Precisa Adicionar ?
+        if (isSelectedToHave && !alreadyHas) {
+            const newFuncao = [...(p.funcao || []), targetFunc];
+            promises.push(fetch(`${API_BASE}/printers/ls`, {
+                method: 'PUT', headers: authHeaders,
+                body: JSON.stringify({ loja: p.loja || state.loja, ip: p.ip, ls: p.ls || {}, funcao: newFuncao })
+            }));
+        } 
+        // Precisa Remover ?
+        else if (!isSelectedToHave && alreadyHas) {
+            const newFuncao = p.funcao.filter(f => f !== targetFunc);
+            promises.push(fetch(`${API_BASE}/printers/ls`, {
+                method: 'PUT', headers: authHeaders,
+                body: JSON.stringify({ loja: p.loja || state.loja, ip: p.ip, ls: p.ls || {}, funcao: newFuncao })
+            }));
         }
+    }
+
+    if (promises.length === 0) {
+       showToast('info', 'Nada a salvar', 'Nenhuma alteração de vínculo detectada.');
+       return;
+    }
+
+    try {
+        await Promise.all(promises);
+        showToast('success', 'Salvo!', `O vínculo para [${targetFunc}] foi atualizado em lote.`);
+        fetchAllPrinters(); // Faz refresh da tela inteira pra sincronizar local state
     } catch (error) {
-        showToast('error', 'Erro', 'Falha na comunicação');
+        showToast('error', 'Erro', 'Falha ao processar os vínculos em lote.');
     }
 });
 

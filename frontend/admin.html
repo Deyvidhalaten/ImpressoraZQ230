@@ -130,12 +130,14 @@
                         <form id="bindFunctionForm" class="admin-form">
                             <div class="form-row">
                                 <div class="form-group" style="flex: 2;">
-                                    <label class="form-label">Atribuir Funções (Múltipla Seleção)</label>
-                                    <select id="bindFuncaoSelect" class="form-select" multiple style="min-height: 120px;"></select>
+                                    <label class="form-label">Selecione uma Função</label>
+                                    <select id="bindFuncaoSelect" class="form-select" style="min-height: 120px;"></select>
                                 </div>
                                 <div class="form-group" style="flex: 1;">
-                                    <label class="form-label">Selecione uma Impressora</label>
-                                    <select id="bindPrinterSelect" class="form-select"></select>
+                                    <label class="form-label">Atribuir Impressoras (Múltipla Seleção)</label>
+                                    <div id="bindPrintersList" class="form-control" style="min-height: 120px; max-height: 200px; overflow-y: auto; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 4px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                                        <!-- Checkboxes serão injetados aqui -->
+                                    </div>
                                 </div>
                             </div>
                             <button type="submit" class="btn btn-primary" style="margin-top: 1rem;">💾 Salvar Vínculo</button>
