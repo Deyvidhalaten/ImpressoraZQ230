@@ -22,7 +22,7 @@ from typing import Any
 ################################################################
 
 BAPI = "https://api.bistek.com.br"
-TOKEN = "eyJ0eXAiOiAiSldUIiwgImFsZyI6ICJIUzI1NiJ9.eyJ1c3VhcmlvIjogImRleXZpZC5zaWx2YSIsICJzZW5oYSI6ICI1Rm4wTipOUCIsICJ0aW1lb3V0IjogMjA4ODY4MTcxMi44Mjk2NTR9.nSqkYEARLEVhKxmnNIPWnoskS-FwN5JqkCYTIAN-Nlk="
+TOKEN = ""
 HEADERS = {
     "Authorization": f"Bearer {TOKEN}",
     "Content-Type": "application/json",

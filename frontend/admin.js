@@ -109,13 +109,17 @@ const elements = {
     newFuncaoSelect: document.getElementById('newFuncao'),
     newLsInputsContainer: document.getElementById('newLsInputsContainer'),
     toastContainer: document.getElementById('toastContainer'),
-    editFuncaoSelect: document.getElementById('editFuncao'),
-    tabBtns: document.querySelectorAll('.tab-btn'),
+    tabBtns: document.querySelectorAll('.admin-tab-btn'),
     adminViews: document.querySelectorAll('.admin-view'),
     
     // Nivel 2: Users
     usersTableBody: document.getElementById('usersTableBody'),
     addUserForm: document.getElementById('addUserForm'),
+    
+    // Novo: Bind Function ZPL
+    bindFunctionForm: document.getElementById('bindFunctionForm'),
+    bindPrinterSelect: document.getElementById('bindPrinterSelect'),
+    bindFuncaoSelect: document.getElementById('bindFuncaoSelect'),
     
     // Nivel 3: Templates
     templatesList: document.getElementById('templatesList'),
@@ -233,13 +237,6 @@ function renderDynamicLsInputs(rebuildingInputsOnly = false) {
     const permissoesPrinter = state.selectedPrinter.funcao || [];
     const objLs = state.selectedPrinter.ls || {};
 
-    if (!rebuildingInputsOnly && elements.editFuncaoSelect) {
-        elements.editFuncaoSelect.innerHTML = state.modos.map(m => {
-            const isSelected = permissoesPrinter.includes(m.key) ? 'selected' : '';
-            return `<option value="${m.key}" ${isSelected}>${m.label}</option>`;
-        }).join('');
-    }
-
     elements.lsInputsContainer.innerHTML = permissoesPrinter.map(func => {
         const valorAtual = objLs[func] !== undefined ? objLs[func] : 0;
         const modoInfo = state.modos.find(m => m.key === func);
@@ -301,6 +298,32 @@ function renderPrinterSelect() {
 function renderPrintersTable() {
     const printers = state.allPrinters.length > 0 ? state.allPrinters : state.printers;
 
+    // Popula dropdown de vinculo de funcoes
+    if (elements.bindPrinterSelect) {
+        elements.bindPrinterSelect.innerHTML = printers.map(p => 
+            `<option value="${p.ip}">${p.nome || p.ip} (Loja ${p.loja || '--'})</option>`
+        ).join('');
+        
+        elements.bindFuncaoSelect.innerHTML = state.modos.map(m =>
+            `<option value="${m.key}">${m.label}</option>`
+        ).join('');
+
+        // Pre-seleciona as funcoes corretas quando muda a impressora selecionada
+        elements.bindPrinterSelect.addEventListener('change', () => {
+            const selectedIp = elements.bindPrinterSelect.value;
+            const printerObj = printers.find(p => p.ip === selectedIp);
+            if(printerObj) {
+                const funcs = printerObj.funcao || [];
+                Array.from(elements.bindFuncaoSelect.options).forEach(opt => {
+                    opt.selected = funcs.includes(opt.value);
+                });
+            }
+        });
+        
+        // Dispara o evento de mudanca inicial para preencher o state do primeiro cara da lista
+        elements.bindPrinterSelect.dispatchEvent(new Event('change'));
+    }
+
     elements.printersTableBody.innerHTML = printers.map(p => {
         const lsKeys = Object.keys(p.ls || {});
         let lsFormatado = '--';
@@ -338,7 +361,8 @@ elements.lsForm.addEventListener('submit', async (e) => {
             lsObject[input.dataset.modo] = parseInt(input.value) || 0;
         });
 
-        const funcao = Array.from(elements.editFuncaoSelect.selectedOptions).map(opt => opt.value);
+        // A funcao atual segue inalterada, apenas a margem muda
+        const funcao = state.selectedPrinter.funcao || [];
 
         const response = await fetch(`${API_BASE}/printers/ls`, {
             method: 'PUT',
@@ -434,6 +458,46 @@ async function deletePrinter(ip, pattern) {
         showToast('error', 'Erro', 'Falha na comunicação');
     }
 }
+
+// Vinculo de Function a Imrpessora (Nivel 2)
+elements.bindFunctionForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const selectedIp = elements.bindPrinterSelect.value;
+    if (!selectedIp) return;
+    
+    // Pega os LS antigos pra manter intactos
+    const printers = state.allPrinters.length > 0 ? state.allPrinters : state.printers;
+    const printerObj = printers.find(p => p.ip === selectedIp);
+    if (!printerObj) return;
+    
+    const novasFuncoes = Array.from(elements.bindFuncaoSelect.selectedOptions).map(opt => opt.value);
+    
+    try {
+        const response = await fetch(`${API_BASE}/printers/ls`, {
+            method: 'PUT',
+            headers: authHeaders,
+            body: JSON.stringify({
+                loja: printerObj.loja || state.loja,
+                ip: printerObj.ip,
+                ls: printerObj.ls || {},
+                funcao: novasFuncoes
+            })
+        });
+
+        if (handleAuthError(response)) return;
+        const data = await response.json();
+
+        if (data.success) {
+            showToast('success', 'Salvo!', 'Vínculo de funções atualizado.');
+            fetchAllPrinters(); // Atualiza backend state
+        } else {
+            showToast('error', 'Erro', data.error || 'Falha ao vincular');
+        }
+    } catch (error) {
+        showToast('error', 'Erro', 'Falha na comunicação');
+    }
+});
 
 // Nivel 2: Users Logic
 
@@ -541,7 +605,7 @@ function renderTemplatesList() {
     const keys = Object.keys(state.templates).sort();
     elements.templatesList.innerHTML = keys.map(name => `
         <li>
-            <a href="#" class="nav-link" style="display:block; padding: 0.5rem; border-radius: 4px; background: ${state.currentTemplate === name ? 'var(--primary-color)' : '#f0f0f0'}; color: ${state.currentTemplate === name ? 'white' : 'black'}; text-decoration:none;" onclick="loadTemplateEditor('${name}')">
+            <a href="#" class="nav-link" style="display:block; padding: 0.5rem; border-radius: 4px; background: ${state.currentTemplate === name ? 'var(--accent-primary)' : '#f0f0f0'}; color: ${state.currentTemplate === name ? 'white' : 'black'}; text-decoration:none;" onclick="loadTemplateEditor('${name}')">
                 📄 ${name}
             </a>
         </li>
@@ -565,7 +629,7 @@ window.loadTemplateEditor = function(filename) {
 };
 
 elements.btnNewTemplate?.addEventListener('click', () => {
-    state.currentTemplate = null;
+    state.currentTemplate = 'novo_modal.zpl.j2';
     elements.tplFilename.value = 'novo_modal.zpl.j2';
     elements.tplContent.value = '^XA\n// Digite seu ZPL Jinja aqui\n^XZ';
     elements.btnDeleteTemplate.style.display = 'none';

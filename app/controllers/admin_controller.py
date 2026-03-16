@@ -32,7 +32,7 @@ def list_printers():
             "ls": p.get("ls", {}),
         }
         for p in mappings
-        if nivel >= 2 or "*" in lojas_permitidas or str(p.get("loja")) in lojas_permitidas
+        if nivel >= 2 or "*" in lojas_permitidas or str(p.get("loja")).zfill(2) in [str(l).zfill(2) for l in lojas_permitidas]
     ])
 
 

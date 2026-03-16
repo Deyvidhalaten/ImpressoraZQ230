@@ -34,10 +34,10 @@
             </div>
             
             <!-- ADMIN TABS (Role-based visibilities) -->
-            <div class="admin-tabs" id="adminTabsContainer" style="display: flex; gap: 1rem; background: var(--bg-color); padding: 1rem 2rem; border-bottom: 1px solid var(--border-color);">
-                <button class="btn btn-primary no-margin tab-btn active" data-target="printersSection" id="tabPrinters">🖨️ Impressoras</button>
-                <button class="btn btn-secondary no-margin tab-btn" data-target="usersSection" id="tabUsers" style="display: none;">👥 Usuários & Lojas</button>
-                <button class="btn btn-secondary no-margin tab-btn" data-target="templatesSection" id="tabTemplates" style="display: none;">📄 Editor ZPL</button>
+            <div class="admin-tabs-container">
+                <button class="admin-tab-btn active" data-target="printersSection" id="tabPrinters">🖨️ Configura Impressora</button>
+                <button class="admin-tab-btn" data-target="usersSection" id="tabUsers" style="display: none;">👥 Cadastro Usuário & Loja</button>
+                <button class="admin-tab-btn" data-target="templatesSection" id="tabTemplates" style="display: none;">📄 Editor ZPL</button>
             </div>
         </header>
 
@@ -57,14 +57,10 @@
                     </div>
                 </section>
 
-                <section class="admin-section" id="configLsSection" style="display: none;">
+                <section class="admin-section" id="configLsSection">
                     <h2 class="section-title">Configurar Funções e Margem (LS)</h2>
                     <div class="card">
                         <form id="lsForm" class="admin-form">
-                            <div class="form-group" style="width: 100%; margin-bottom: 1rem;" id="editFuncaoGroup">
-                                <label for="editFuncao" class="form-label">Funções Habilitadas</label>
-                                <select id="editFuncao" class="form-select" multiple></select>
-                            </div>
                             <div class="form-row" id="lsInputsContainer" style="flex-wrap: wrap;"></div>
                             <button type="submit" class="btn btn-primary" style="margin-top: 1rem;" id="btnSalvarLS">💾 Salvar Configurações</button>
                         </form>
@@ -122,6 +118,26 @@
                         </div>
                     </div>
                 </section>
+
+                <!-- NOVO: Vinculo de Funcoes com Impressoras -->
+                <section class="admin-section" style="margin-top: 2rem;">
+                    <h2 class="section-title">Vincular Impressora a Função ZPL</h2>
+                    <div class="card">
+                        <form id="bindFunctionForm" class="admin-form">
+                            <div class="form-row">
+                                <div class="form-group" style="flex: 1;">
+                                    <label class="form-label">Selecione uma Impressora</label>
+                                    <select id="bindPrinterSelect" class="form-select"></select>
+                                </div>
+                                <div class="form-group" style="flex: 1;">
+                                    <label class="form-label">Atribuir Funções (Múltipla Seleção)</label>
+                                    <select id="bindFuncaoSelect" class="form-select" multiple></select>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="margin-top: 1rem;">💾 Salvar Vínculo</button>
+                        </form>
+                    </div>
+                </section>
             </div>
 
             <!-- ============================================ -->
@@ -131,7 +147,7 @@
                 <section class="admin-section">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                         <h2 class="section-title" style="margin:0;">Templates ZPL ({Função})</h2>
-                        <button class="btn btn-primary" id="btnNewTemplate">📄 Novo Gabarito</button>
+                        <button class="btn btn-primary" id="btnNewTemplate">📄 Novo Arquivo ZPL</button>
                     </div>
                     
                     <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">

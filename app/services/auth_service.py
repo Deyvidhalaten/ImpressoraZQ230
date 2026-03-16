@@ -106,11 +106,13 @@ def require_admin_nivel(min_nivel: int):
 
 
 import os
-BAPI = "https://api.bistek.com.br" # environ["BSTK_BAPI"]
+BAPI = os.getenv("BSTK_BAPI", "https://api.bistek.com.br")
+TOKEN = os.getenv("TOKEN_AD", "")
 HEADERS = {
     "Authorization": f"Bearer {TOKEN}",
     "Content-Type": "application/json",
 }
+
 
 class Autenticado(BaseModel):
     sucesso: bool = False
@@ -122,7 +124,7 @@ async def patch_bapi_autenticador(envio: dict) -> Autenticado:
     if not TOKEN:
         return Autenticado(mensagem="Token não informado")
 
-    async with ClientSession() as s:
+    async with ClientSession(headers=HEADERS) as s:
         async with s.patch(f"{BAPI}/ad/autenticacao", json=envio, ssl=False) as r:
             retorno = {"ok": False}
             if r.status in(200, 400, 401):

@@ -596,6 +596,38 @@ body {
    Admin Styles
    ============================================ */
 
+.admin-tabs-container {
+    display: flex;
+    gap: 4px;
+    padding: 0 var(--space-xl);
+    padding-top: var(--space-md);
+    background: var(--accent-primary);
+}
+
+.admin-tab-btn {
+    padding: var(--space-sm) var(--space-lg);
+    background: rgba(0, 0, 0, 0.15);
+    color: rgba(255, 255, 255, 0.8);
+    border: none;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    font-weight: 600;
+    font-family: inherit;
+    font-size: 0.9375rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.admin-tab-btn:hover {
+    background: rgba(0, 0, 0, 0.25);
+    color: white;
+}
+
+.admin-tab-btn.active {
+    background: var(--bg-primary);
+    color: var(--accent-primary);
+    box-shadow: 0 -4px 10px rgba(0,0,0,0.05);
+}
+
 .admin-view {
     display: none;
     animation: fadeIn 0.3s ease;
