@@ -47,11 +47,15 @@
             <!-- SECTION: IMPRESSORAS (Nível ≥ 1)               -->
             <!-- ============================================ -->
             <div id="printersSection" class="admin-view active">
-                <section class="admin-section">
+                <section class="admin-section" id="printersSectionContainer">
                     <h2 class="section-title">Selecionar Impressora</h2>
-                    <div class="card">
-                        <div class="form-group">
-                            <label for="printerAdminSelect" class="form-label">Minhas Impressoras Permitidas</label>
+                    <div class="card" style="display: flex; gap: 1rem; align-items: flex-end;">
+                        <div class="form-group" style="flex: 1;">
+                            <label class="form-label">Minhas Lojas Permitidas</label>
+                            <select id="storeAdminSelect" class="form-select"></select>
+                        </div>
+                        <div class="form-group" style="flex: 2;">
+                            <label class="form-label">Impressoras da Loja Selecionada</label>
                             <select id="printerAdminSelect" class="form-select"></select>
                         </div>
                     </div>
@@ -67,7 +71,7 @@
                     </div>
                 </section>
                 
-                <section class="admin-section" id="addPrinterSectionContainer" style="display: none;">
+                <section class="admin-section" id="addPrinterSectionContainer">
                     <h2 class="section-title">Impressoras</h2>
                     <div class="card">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
@@ -125,13 +129,13 @@
                     <div class="card">
                         <form id="bindFunctionForm" class="admin-form">
                             <div class="form-row">
+                                <div class="form-group" style="flex: 2;">
+                                    <label class="form-label">Atribuir Funções (Múltipla Seleção)</label>
+                                    <select id="bindFuncaoSelect" class="form-select" multiple style="min-height: 120px;"></select>
+                                </div>
                                 <div class="form-group" style="flex: 1;">
                                     <label class="form-label">Selecione uma Impressora</label>
                                     <select id="bindPrinterSelect" class="form-select"></select>
-                                </div>
-                                <div class="form-group" style="flex: 1;">
-                                    <label class="form-label">Atribuir Funções (Múltipla Seleção)</label>
-                                    <select id="bindFuncaoSelect" class="form-select" multiple></select>
                                 </div>
                             </div>
                             <button type="submit" class="btn btn-primary" style="margin-top: 1rem;">💾 Salvar Vínculo</button>

@@ -37,12 +37,18 @@ def list_printers():
 
 
 @bp.route("/printers", methods=["POST", "OPTIONS"])
-@require_admin_nivel(2)
+@require_auth
 def add_printer():
     """Adiciona uma nova impressora."""
     if request.method == "OPTIONS":
         return "", 204
         
+    auth_header = request.headers.get("Authorization")
+    token = auth_header.split(" ")[1]
+    user_data = verify_auth_token(token)
+    nivel = user_data.get("nivel", 1)
+    lojas_permitidas = user_data.get("lojas", [])
+
     data = request.get_json(force=True)
     DIRS = current_app.config["DIRS"]
     mappings = load_printer_map_from(DIRS["data"])
@@ -50,6 +56,18 @@ def add_printer():
     loja = str(data.get("loja", "")).strip()
     if not loja.isdigit():
         return jsonify({"success": False, "error": "Loja inválida"}), 400
+
+    # Nível 1 security check
+    if nivel < 2 and "*" not in lojas_permitidas and str(loja).zfill(2) not in [str(l).zfill(2) for l in lojas_permitidas]:
+        return jsonify({"success": False, "error": "Acesso negado para criar nesta loja"}), 403
+
+    ip = data.get("ip", "").strip()
+    
+    # Validação do IP vs Loja para todos os níveis
+    # Ex: Loja 17 obriga a rede a ser 10.17.*
+    required_prefix = f"10.{int(loja)}."
+    if not ip.startswith(required_prefix):
+        return jsonify({"success": False, "error": f"O IP da impressora ({ip}) não condiz com a rede da Loja {loja} ({required_prefix}*)"}), 400
 
     new_printer = {
         "loja": loja,
@@ -69,11 +87,17 @@ def add_printer():
 
 
 @bp.route("/printers", methods=["DELETE", "OPTIONS"])
-@require_admin_nivel(2)
+@require_auth
 def delete_printer():
     """Remove uma impressora."""
     if request.method == "OPTIONS":
         return "", 204
+
+    auth_header = request.headers.get("Authorization")
+    token = auth_header.split(" ")[1]
+    user_data = verify_auth_token(token)
+    nivel = user_data.get("nivel", 1)
+    lojas_permitidas = user_data.get("lojas", [])
         
     data = request.get_json(force=True)
     ip = data.get("ip")
@@ -81,6 +105,16 @@ def delete_printer():
 
     DIRS = current_app.config["DIRS"]
     mappings = load_printer_map_from(DIRS["data"])
+    
+    # Locate the printer to check its store
+    target_printer = next((p for p in mappings if p.get("ip") == ip and p.get("pattern") == pattern), None)
+    if not target_printer:
+        return jsonify({"success": False, "error": "Impressora não encontrada"}), 404
+        
+    # Nível 1 security check
+    target_loja = str(target_printer.get("loja", ""))
+    if nivel < 2 and "*" not in lojas_permitidas and target_loja.zfill(2) not in [str(l).zfill(2) for l in lojas_permitidas]:
+        return jsonify({"success": False, "error": "Acesso negado para excluir nesta loja"}), 403
 
     original_count = len(mappings)
     mappings = [p for p in mappings if not (p.get("ip") == ip and p.get("pattern") == pattern)]
@@ -95,11 +129,17 @@ def delete_printer():
 
 
 @bp.route("/printers/ls", methods=["PUT", "OPTIONS"])
-@require_admin_nivel(2)
+@require_auth
 def update_ls():
     """Atualiza LS de uma impressora."""
     if request.method == "OPTIONS":
         return "", 204
+
+    auth_header = request.headers.get("Authorization")
+    token = auth_header.split(" ")[1]
+    user_data = verify_auth_token(token)
+    nivel = user_data.get("nivel", 1)
+    lojas_permitidas = user_data.get("lojas", [])
 
     data = request.get_json(force=True)
     target_ip = data.get("ip")
@@ -112,6 +152,11 @@ def update_ls():
     updated = False
     for p in mappings:
         if p.get("ip") == target_ip:
+            # Nível 1 security check
+            target_loja = str(p.get("loja", ""))
+            if nivel < 2 and "*" not in lojas_permitidas and target_loja.zfill(2) not in [str(l).zfill(2) for l in lojas_permitidas]:
+                return jsonify({"success": False, "error": "Acesso negado para editar LS nesta loja"}), 403
+                
             if "ls" not in p: p["ls"] = {}
             p["ls"].update(ls_data)
             

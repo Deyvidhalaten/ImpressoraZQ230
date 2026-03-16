@@ -47,8 +47,6 @@ document.getElementById('userLevelBadge').textContent = currentUserLevel;
 // Exibir abas apenas se permitido
 if (currentUserLevel >= 2) {
     document.getElementById('tabUsers').style.display = 'inline-block';
-    document.getElementById('addPrinterSectionContainer').style.display = 'block';
-    document.getElementById('configLsSection').style.display = 'block';
 }
 if (currentUserLevel >= 3) {
     document.getElementById('tabTemplates').style.display = 'inline-block';
@@ -101,6 +99,7 @@ const state = {
 };
 
 const elements = {
+    storeAdminSelect: document.getElementById('storeAdminSelect'),
     printerAdminSelect: document.getElementById('printerAdminSelect'),
     lsInputsContainer: document.getElementById('lsInputsContainer'),
     lsForm: document.getElementById('lsForm'),
@@ -183,7 +182,7 @@ async function fetchContext() {
         state.printers = data.printers;
         state.modos = data.modos; // [{key: 'flv', label: 'Flv'}, ...]
 
-        renderPrinterSelect();
+        renderStoreSelect();
         renderNewFuncaoOptions();
     } catch (error) {
         showToast('error', 'Erro', 'Falha ao carregar dados do Contexto: ' + error.message);
@@ -221,6 +220,7 @@ async function fetchAllPrinters() {
             state.allPrinters = await response.json();
             if (state.modos) { // Só renderiza a tabela se modos já estiver populado
                 renderPrintersTable();
+                renderStoreSelect();
             }
         }
     } catch (error) {
@@ -275,23 +275,59 @@ if (elements.editFuncaoSelect) {
     });
 }
 
+function renderStoreSelect() {
+    if (!elements.storeAdminSelect) return;
+    const impressoras = state.allPrinters.length > 0 ? state.allPrinters : state.printers;
+    // Extrai Lojas Unicas
+    const lojasUnicas = [...new Set(impressoras.map(p => String(p.loja || '').padStart(2, '0')).filter(l => l !== '00'))].sort();
+    
+    const currSelection = elements.storeAdminSelect.value;
+    
+    elements.storeAdminSelect.innerHTML = lojasUnicas.map(l => 
+        `<option value="${l}">Loja ${l}</option>`
+    ).join('');
+    
+    if (lojasUnicas.length > 0) {
+        if (currSelection && lojasUnicas.includes(currSelection)) {
+            elements.storeAdminSelect.value = currSelection;
+        } else if (state.loja && lojasUnicas.includes(String(state.loja).padStart(2, '0'))) {
+            elements.storeAdminSelect.value = String(state.loja).padStart(2, '0');
+        } else {
+            elements.storeAdminSelect.value = lojasUnicas[0];
+        }
+    }
+    
+    elements.storeAdminSelect.onchange = () => renderPrinterSelect();
+    renderPrinterSelect();
+}
+
 // Render printer select
 function renderPrinterSelect() {
-    elements.printerAdminSelect.innerHTML = state.printers.map(p => `
+    const impressoras = state.allPrinters.length > 0 ? state.allPrinters : state.printers;
+    const selectedLoja = elements.storeAdminSelect ? elements.storeAdminSelect.value : null;
+    
+    const impressorasFiltradas = selectedLoja 
+        ? impressoras.filter(p => String(p.loja || '').padStart(2, '0') === selectedLoja)
+        : impressoras;
+
+    elements.printerAdminSelect.innerHTML = impressorasFiltradas.map(p => `
         <option value="${p.ip}">${p.nome || p.ip} - ${(p.funcao || []).join(', ')}</option>
     `).join('');
 
-    if (state.printers.length > 0) {
-        state.selectedPrinter = state.printers[0];
+    if (impressorasFiltradas.length > 0) {
+        state.selectedPrinter = impressorasFiltradas[0];
         renderDynamicLsInputs();
+    } else {
+        state.selectedPrinter = null;
+        elements.lsInputsContainer.innerHTML = '<p style="color:var(--text-secondary); width: 100%; text-align: center; margin-top: 1rem;">Nenhuma impressora disponível nesta filial.</p>';
     }
 
-    elements.printerAdminSelect.addEventListener('change', (e) => {
-        state.selectedPrinter = state.printers.find(p => p.ip === e.target.value);
+    elements.printerAdminSelect.onchange = (e) => {
+        state.selectedPrinter = impressorasFiltradas.find(p => p.ip === e.target.value);
         if (state.selectedPrinter) {
             renderDynamicLsInputs();
         }
-    });
+    };
 }
 
 // Render printers table
