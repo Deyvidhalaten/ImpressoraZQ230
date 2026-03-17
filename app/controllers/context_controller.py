@@ -1,7 +1,6 @@
 import fnmatch
 from flask import Blueprint, request, jsonify, current_app
 from app.repositories.printer_repository import load_printer_map_from
-from app.services.product_service import consulta_Base, busca_por_descricao
 from app.services.printing_service import _is_test_mode
 from app.services.templates_service import list_templates_by_mode
 from app.dtos.context_response_dto import ContextResponseDTO, PrinterResponseDTO, ModosResponseDTO
