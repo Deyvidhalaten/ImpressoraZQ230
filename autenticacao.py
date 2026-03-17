@@ -8,19 +8,6 @@ from os import environ
 from pydantic import BaseModel
 from typing import Any
 
-################################################################
-##  Autenticador Bistek:                                      ##
-##    Uso exclusivo somente para utilização interna.          ##
-##  1. Solicite seu Token de acesso;                          ##
-##  2. Crie as variavéis de ambiente:                         ##
-##    a. [produção]: BSTK_BAPI=https://api.bistek.com.br      ##
-##    b. [homologação]: BSTK_BAPI=https://dev.bistek.com.br   ##
-##    c. TOKEN_AD={solicitação para T.I}                      ##
-##  3. Instale as dependências listadas na importação acima.  ##
-##                                                            ##
-##  - Criado por Jarede e Jepherson, Dev's T.I          2025  ##
-################################################################
-
 BAPI = "https://api.bistek.com.br"
 TOKEN = ""
 HEADERS = {
@@ -91,5 +78,5 @@ if __name__ == "__main__":
         asyncio.set_event_loop_policy(
             asyncio.WindowsSelectorEventLoopPolicy()  # type:ignore
         )
-    autenticado = asyncio.run(realizar_login_ad('lj17.mb02', 'Bstk##2023'))
+    autenticado = asyncio.run(realizar_login_ad('login', 'senha'))
     print(autenticado)
