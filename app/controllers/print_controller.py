@@ -1,9 +1,10 @@
+import asyncio
 import fnmatch
 from datetime import date, datetime, timedelta
 from flask import Blueprint, request, jsonify, current_app
 
 from app.repositories.printer_repository import load_printer_map_from
-from app.services.product_service import consulta_Base
+from app.services.product_service import ProductService
 from app.services.printing_service import enviar_para_impressora_ip, _is_test_mode
 from app.services.templates_service import list_templates_by_mode, render_zpl
 from app.services.log_service import log_audit, log_error, log_stats
@@ -13,6 +14,7 @@ bp = Blueprint("print_controller", __name__, url_prefix="/api")
 
 @bp.route("/print", methods=["POST", "OPTIONS"])
 def print_label():
+    service = ProductService
     """Recebe JSON e envia para impressora (ou simula)."""
     if request.method == "OPTIONS":
         return "", 204
@@ -62,7 +64,7 @@ def print_label():
     # Consulta produto
     db = current_app.config["DB_FLV"] if dto.modo == "flv" or "padaria" else current_app.config["DB"]
     try:
-        rec = consulta_Base(dto.codigo, db)
+        rec = asyncio.run(service.buscar_por_codigo(dto.codigo, db))
         trace.add("consulta_db_result", found=bool(rec))
     except Exception as e:
         trace.add("consulta_db_erro", erro=str(e))

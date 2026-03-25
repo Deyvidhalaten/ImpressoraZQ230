@@ -1,8 +1,13 @@
+import asyncio
 import fnmatch
+import os
+from dotenv import load_dotenv
 from flask import Blueprint, request, jsonify, current_app
 from app.repositories.printer_repository import load_printer_map_from
+from app.repositories.product_repository import ProductRepository
 from app.services.printing_service import _is_test_mode
 from app.services.templates_service import list_templates_by_mode
+from app.services.product_service import ProductService
 from app.dtos.context_response_dto import ContextResponseDTO, PrinterResponseDTO, ModosResponseDTO
 from app.mappers.product_mapper import ProductMapper
 
@@ -10,6 +15,15 @@ bp = Blueprint("context_controller", __name__, url_prefix="/api")
 
 @bp.route("/context", methods=["GET", "OPTIONS"])
 def context():
+    load_dotenv()
+    
+    # 1. Pega as configuraçõe
+    bapi_url = os.getenv("BSTK_BAPI")
+    token_ad = os.getenv("TOKEN_AD")
+
+    product_repo = ProductRepository(base_url=bapi_url, token=token_ad)
+    product_service = ProductService(client_api=product_repo)
+    
     """Retorna info de contexto: loja detectada, impressoras, modos disponíveis."""
     if request.method == "OPTIONS":
         return "", 204
@@ -73,6 +87,7 @@ def context():
 
 @bp.route("/search", methods=["GET", "OPTIONS"])
 def search_products():
+    service = ProductService
     """Busca produtos por código ou descrição."""
     if request.method == "OPTIONS":
         return "", 204
@@ -90,14 +105,14 @@ def search_products():
         return jsonify({"products": [], "error": "Query vazia"})
 
     # Seleciona a base de dados correta
-    db = current_app.config["DB_FLV"] if modo == "flv" or "padaria" else current_app.config["DB"]
+    #db = current_app.config["DB_FLV"] if modo == "flv" or "padaria" else current_app.config["DB"]
     products = []
-
+    
     if search_type == "descricao":
-        resultados = busca_por_descricao(query, db, limite=limit)
+        resultados = asyncio.run(service.buscar_por_descricao(query, db, limite=limit))
         products = [ProductMapper.to_dto(r).to_dict() for r in resultados]
     else:
-        rec = consulta_Base(query, db)
+        rec = asyncio.run(service.buscar_por_codigo(query, db))
         if rec:
             products = [ProductMapper.to_dto(rec).to_dict()]
 

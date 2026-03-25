@@ -15,3 +15,9 @@ class ProductResponseDTO:
             "descricao": self.descricao,
             "validade": self.validade
         }
+class RespostaAPI:
+    def __init__(self, sucesso: bool, status: int, dados: dict = None, erro: str = None):
+        self.sucesso = sucesso
+        self.status = status
+        self.dados = dados or {}
+        self.erro = erro
