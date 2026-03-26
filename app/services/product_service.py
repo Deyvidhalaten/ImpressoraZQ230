@@ -4,9 +4,9 @@ from app.repositories.product_repository import ProductRepository
 
 
 class ProductService:
-    def __init__(self, client_api):
+    def __init__(self, client_api, token: str):
         self.client_api = client_api
-    repository = ProductRepository
+        self.repository = ProductRepository(base_url=client_api, token=token)
 
     async def buscar_por_codigo(self, cod_empresa: int, entrada: str):
         """

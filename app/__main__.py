@@ -1,9 +1,14 @@
+import asyncio
+
+from dotenv import load_dotenv
 import os, sys, ssl, urllib3
 from flask import Flask, jsonify
 from PIL import ImageFont
 
 from app.constants import BASE_DIR, SECRET_KEY, PERMANENT_SESSION_LIFETIME
 from app.bootstrap import init_data_layout
+from app.repositories.filial_repository import FilialRepository
+from app.services.filial_service import FilialService
 from app.services.logging_setup import setup_logging
 from app.services.log_service import init_loggers
 from app.controllers.auth_controller import bp as auth_bp
@@ -11,6 +16,8 @@ from app.controllers.context_controller import bp as context_bp
 from app.controllers.print_controller import bp as print_bp
 from app.controllers.admin_controller import bp as admin_bp
 from app.controllers.stats_controller import bp as stats_bp
+from app.services.product_service import ProductService
+from app.services.product_service import ProductService
 from app.services.templates_service import criar_ambiente_zpl
 from app.services.auth_service import init_users_file
 from app.repositories.product_repository import load_db_flor_from, load_db_flv_from
@@ -32,6 +39,8 @@ else:
 DIRS = init_data_layout(REPO_BASE)
 init_users_file(DIRS["data"])
 loggers = setup_logging(DIRS["logs"])
+#filial = await client.consultar_produto(loja=loja_teste, ean=ean_teste)
+
 init_loggers(
     audit=loggers["audit"],
     error=loggers["error"],
@@ -48,13 +57,31 @@ app.permanent_session_lifetime = PERMANENT_SESSION_LIFETIME
 app.config["DIRS"]   = DIRS
 app.config["DB"]     = load_db_flor_from(DIRS["data"])
 app.config["DB_FLV"] = load_db_flv_from(DIRS["data"])
+
 zpl_templates_dir = DIRS["templates"]  # ProgramData\BistekPrinter\zpl_templates
 
 
 
 app.config["ZPL_ENV"] = criar_ambiente_zpl(zpl_templates_dir)
+load_dotenv()
+# 1. Pega as configuraçõe
+bapi_url = os.getenv("BSTK_BAPI")
+token_ad = os.getenv("TOKEN_AD")
 
-# Filtros Customizados
+# 2. Instancia a infraestrutura
+filial_repo = FilialRepository(base_url=bapi_url, token=token_ad)
+servico_filiais = FilialService(filial_repo)
+servico_produtos = ProductService(client_api=bapi_url, token=token_ad)
+app.config['PRODUCT_SERVICE'] = servico_produtos
+
+print("Iniciando carga de filiais...")
+sucesso = asyncio.run(servico_filiais.sincronizar_rede())
+app.config['FILIAL_SERVICE_INSTANCIA'] = servico_filiais
+
+if not sucesso:
+    print("Base de Filiais não caregou")
+else:
+    print(f"Sucesso! {len(servico_filiais.mapa_ip_filial)} filiais mapeadas.")
 
 
 # Fonte (fallback)
@@ -104,14 +131,8 @@ def shutdown():
     from app.services.log_service import log_audit
     from flask import request
     
-    # É fundamental garantir auth forte aqui, porem para facilitar integracao com o frontend
-    # verificaremos se há um token valido ou simplesmente logaremos fortemente. 
-    # Como o painel do Admin e local-only ou intranet, adicionamos log de auditoria.
     log_audit("system_shutdown", ip=request.remote_addr, detalhes="Shutdown solicitado via API")
     
-    # O Waitress não tem gracefully shutdown por handler, os._exit força fim do processo
-    # Quando atrelado a um Serviço do Windows (NSSM/pywin32), o serviço será reportado como Stopped 
-    # e, dependendo da configuração de recovery, ele pode se reiniciar.
     import threading
     def kill_process():
         import time
@@ -130,7 +151,7 @@ if __name__ == "__main__" or __name__ == "app.__main__":
         is_dev = os.environ.get("FLASK_ENV") == "development" or hasattr(sys, 'gettrace') and sys.gettrace() is not None
         
         # Em desenvolvimento: threaded=False para breakpoints funcionarem no VS Code
-        # Em produção: threaded=True para melhor performance
+        # Em produção: threaded=True
         app.run(
             host="0.0.0.0", 
             port=8000, 

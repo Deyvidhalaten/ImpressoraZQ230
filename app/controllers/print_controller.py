@@ -4,6 +4,8 @@ from datetime import date, datetime, timedelta
 from flask import Blueprint, request, jsonify, current_app
 
 from app.repositories.printer_repository import load_printer_map_from
+from app.services.filial_service import FilialService
+from app.services.filial_service import FilialService
 from app.services.product_service import ProductService
 from app.services.printing_service import enviar_para_impressora_ip, _is_test_mode
 from app.services.templates_service import list_templates_by_mode, render_zpl
@@ -14,7 +16,8 @@ bp = Blueprint("print_controller", __name__, url_prefix="/api")
 
 @bp.route("/print", methods=["POST", "OPTIONS"])
 def print_label():
-    service = ProductService
+    service = ProductService()
+    f_service: FilialService = current_app.config.get('FILIAL_SERVICE_INSTANCIA')
     """Recebe JSON e envia para impressora (ou simula)."""
     if request.method == "OPTIONS":
         return "", 204
@@ -62,9 +65,16 @@ def print_label():
         return jsonify({"success": False, "error": "Loja não cadastrada"}), 404
 
     # Consulta produto
-    db = current_app.config["DB_FLV"] if dto.modo == "flv" or "padaria" else current_app.config["DB"]
+    #db = current_app.config["DB_FLV"] if dto.modo == "flv" or "padaria" else current_app.config["DB"]
     try:
-        rec = asyncio.run(service.buscar_por_codigo(dto.codigo, db))
+        client_ip = request.remote_addr
+        if f_service: 
+            cod_empresa = f_service.encontra_filial_por_ip(client_ip)
+
+        if not cod_empresa:
+            return {"erro": "Erro na busca Filial"}, 400
+        
+        rec = asyncio.run(service.buscar_por_codigo(cod_empresa, dto.codigo))
         trace.add("consulta_db_result", found=bool(rec))
     except Exception as e:
         trace.add("consulta_db_erro", erro=str(e))

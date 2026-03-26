@@ -4,5 +4,6 @@
         "**/*.pyc": true,
         "**/__pycache__": true,
         "**/__init__.py": true,
-    }
+    },
+    "python-envs.defaultEnvManager": "ms-python.python:system"
 }

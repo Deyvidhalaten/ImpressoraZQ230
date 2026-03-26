@@ -1,10 +1,8 @@
-import asyncio
 import fnmatch
 import os
-from dotenv import load_dotenv
 from flask import Blueprint, request, jsonify, current_app
 from app.repositories.printer_repository import load_printer_map_from
-from app.repositories.product_repository import ProductRepository
+from app.services.filial_service import FilialService
 from app.services.printing_service import _is_test_mode
 from app.services.templates_service import list_templates_by_mode
 from app.services.product_service import ProductService
@@ -15,15 +13,7 @@ bp = Blueprint("context_controller", __name__, url_prefix="/api")
 
 @bp.route("/context", methods=["GET", "OPTIONS"])
 def context():
-    load_dotenv()
-    
-    # 1. Pega as configuraçõe
-    bapi_url = os.getenv("BSTK_BAPI")
-    token_ad = os.getenv("TOKEN_AD")
 
-    product_repo = ProductRepository(base_url=bapi_url, token=token_ad)
-    product_service = ProductService(client_api=product_repo)
-    
     """Retorna info de contexto: loja detectada, impressoras, modos disponíveis."""
     if request.method == "OPTIONS":
         return "", 204
@@ -86,8 +76,16 @@ def context():
 
 
 @bp.route("/search", methods=["GET", "OPTIONS"])
-def search_products():
-    service = ProductService
+async def search_products():
+    f_service: FilialService = current_app.config.get('FILIAL_SERVICE_INSTANCIA')
+    bapi_url = os.getenv("BSTK_BAPI")
+    token = os.getenv("TOKEN_AD")
+    productService = ProductService(client_api=bapi_url, token=token)
+
+    if f_service is None:
+        print("ERRO: filial_service não encontrado no config!")
+        return jsonify({"error": "Sistema não inicializado corretamente"}), 500
+    
     """Busca produtos por código ou descrição."""
     if request.method == "OPTIONS":
         return "", 204
@@ -107,12 +105,21 @@ def search_products():
     # Seleciona a base de dados correta
     #db = current_app.config["DB_FLV"] if modo == "flv" or "padaria" else current_app.config["DB"]
     products = []
+    try:
+        client_ip = request.remote_addr
+        if f_service: 
+            cod_empresa = f_service.encontra_filial_por_ip(client_ip)
+
+        if not cod_empresa:
+            return {"erro": "Erro na busca Filial"}, 400
+    except (ValueError, TypeError):
+        return {"erro": "Erro na busca Filial "}, 400
     
     if search_type == "descricao":
-        resultados = asyncio.run(service.buscar_por_descricao(query, db, limite=limit))
+        resultados = await productService.buscar_por_descricao(cod_empresa, query)
         products = [ProductMapper.to_dto(r).to_dict() for r in resultados]
     else:
-        rec = asyncio.run(service.buscar_por_codigo(query, db))
+        rec = await productService.buscar_por_codigo(cod_empresa, query)
         if rec:
             products = [ProductMapper.to_dto(rec).to_dict()]
 
