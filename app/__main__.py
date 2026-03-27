@@ -20,7 +20,6 @@ from app.services.product_service import ProductService
 from app.services.product_service import ProductService
 from app.services.templates_service import criar_ambiente_zpl
 from app.services.auth_service import init_users_file
-from app.repositories.product_repository import load_db_flor_from, load_db_flv_from
 from app.repositories.printer_repository import load_printer_map_from
 
 # SSL / Warnings
@@ -55,8 +54,6 @@ app.permanent_session_lifetime = PERMANENT_SESSION_LIFETIME
 
 # Disponibiliza ProgramData e bases às rotas
 app.config["DIRS"]   = DIRS
-app.config["DB"]     = load_db_flor_from(DIRS["data"])
-app.config["DB_FLV"] = load_db_flv_from(DIRS["data"])
 
 zpl_templates_dir = DIRS["templates"]  # ProgramData\BistekPrinter\zpl_templates
 
@@ -75,11 +72,17 @@ servico_produtos = ProductService(client_api=bapi_url, token=token_ad)
 app.config['PRODUCT_SERVICE'] = servico_produtos
 
 print("Iniciando carga de filiais...")
-sucesso = asyncio.run(servico_filiais.sincronizar_rede())
+try:
+    # Bloqueante, mas crítico para o serviço. Offline tolerado.
+    sucesso = asyncio.run(servico_filiais.sincronizar_rede())
+except Exception as e:
+    print(f"Falha de conexão com a API BAPI: {e}")
+    sucesso = False
+
 app.config['FILIAL_SERVICE_INSTANCIA'] = servico_filiais
 
 if not sucesso:
-    print("Base de Filiais não caregou")
+    print("Aviso: Base de Filiais operando em modo degradado / offline.")
 else:
     print(f"Sucesso! {len(servico_filiais.mapa_ip_filial)} filiais mapeadas.")
 

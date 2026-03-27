@@ -51,6 +51,7 @@ if (currentUserLevel >= 2) {
 if (currentUserLevel >= 3) {
     document.getElementById('tabTemplates').style.display = 'inline-block';
     document.getElementById('optNivel3').style.display = 'block';
+    document.getElementById('tabAudit').style.display = 'inline-block';
 }
 
 const authHeaders = {
@@ -126,7 +127,10 @@ const elements = {
     tplContent: document.getElementById('tplContent'),
     btnSaveTemplate: document.getElementById('btnSaveTemplate'),
     btnDeleteTemplate: document.getElementById('btnDeleteTemplate'),
-    btnNewTemplate: document.getElementById('btnNewTemplate')
+    btnNewTemplate: document.getElementById('btnNewTemplate'),
+    
+    // Nivel 3: Auditoria
+    auditTableBody: document.getElementById('auditTableBody')
 };
 
 // Aba de Navegação
@@ -142,6 +146,7 @@ elements.tabBtns.forEach(btn => {
         // Lazy load modules se a aba for clicada
         if(targetId === 'usersSection' && Object.keys(state.users).length === 0) fetchUsers();
         if(targetId === 'templatesSection' && Object.keys(state.templates).length === 0) fetchTemplates();
+        if(targetId === 'auditSection') fetchAuditLogs();
     });
 });
 
@@ -734,3 +739,51 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error("Erro na inicialização do Admin: ", err);
     }
 });
+
+// ==========================================
+// Nivel 3: Auditoria Geral
+// ==========================================
+async function fetchAuditLogs() {
+    if (currentUserLevel < 3) return;
+    try {
+        const response = await fetch(`${API_BASE}/logs/audit`, { headers: authHeaders });
+        if (handleAuthError(response)) return;
+        const logs = await response.json();
+        renderAuditTable(logs);
+    } catch (e) {
+        showToast('error', 'Erro', 'Falha ao buscar logs de auditoria');
+    }
+}
+
+function renderAuditTable(logsArray) {
+    if (!elements.auditTableBody) return;
+    
+    if (logsArray.length === 0) {
+        elements.auditTableBody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Nenhum log encontrado.</td></tr>';
+        return;
+    }
+    
+    elements.auditTableBody.innerHTML = logsArray.map(log => {
+        const dateStr = log.timestamp || '--';
+        const clientIp = log.client_ip || '--';
+        const action = log.action || 'Desconhecida';
+        
+        let details = '';
+        const metaKeys = Object.keys(log).filter(k => !['timestamp', 'client_ip', 'action', 'method', 'path', 'user_agent'].includes(k));
+        
+        if (metaKeys.length > 0) {
+            details = metaKeys.map(k => `<strong>${k}:</strong> ${JSON.stringify(log[k])}`).join(' | ');
+        } else {
+            details = '<span style="color:#aaa;">Sem detalhes adicionais</span>';
+        }
+        
+        return `
+            <tr>
+                <td style="font-size: 0.85em;">${dateStr}</td>
+                <td style="font-family: monospace;">${clientIp}</td>
+                <td><span style="background:var(--bg-color); padding:0.2rem 0.5rem; border-radius:4px; font-weight:600;">${action}</span></td>
+                <td style="font-size: 0.85em; color:var(--text-secondary);">${details}</td>
+            </tr>
+        `;
+    }).join('');
+}

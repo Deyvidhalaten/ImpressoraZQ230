@@ -38,6 +38,7 @@
                 <button class="admin-tab-btn active" data-target="printersSection" id="tabPrinters">🖨️ Configura Impressora</button>
                 <button class="admin-tab-btn" data-target="usersSection" id="tabUsers" style="display: none;">👥 Cadastro Usuário & Loja</button>
                 <button class="admin-tab-btn" data-target="templatesSection" id="tabTemplates" style="display: none;">📄 Editor ZPL</button>
+                <button class="admin-tab-btn" data-target="auditSection" id="tabAudit" style="display: none;">🛡️ Auditoria Geral</button>
             </div>
         </header>
 
@@ -219,6 +220,32 @@
                 </div>
             </div>
         </div>
+
+            <!-- ============================================ -->
+            <!-- SECTION: AUDITORIA GERAL (Nível 3)             -->
+            <!-- ============================================ -->
+            <div id="auditSection" class="admin-view">
+                <section class="admin-section">
+                    <h2 class="section-title">Registro de Eventos (Audit Log)</h2>
+                    <div class="card">
+                        <div class="table-container">
+                            <table class="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 15%;">Data / Hora</th>
+                                        <th style="width: 10%;">IP Autor</th>
+                                        <th style="width: 25%;">Ação Executada</th>
+                                        <th style="width: 50%;">Detalhes (Metadados)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="auditTableBody">
+                                    <!-- Populated via Javascript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            </div>
 
         <!-- Add User Modal -->
         <div class="modal-overlay" id="addUserModal">

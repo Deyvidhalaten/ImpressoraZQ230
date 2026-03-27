@@ -118,20 +118,5 @@ def init_data_layout(repo_base_dir: str) -> dict:
         with printers_json.open('w', encoding='utf-8') as f:
              json.dump(base_hierarquica, f, indent=4, ensure_ascii=False)
 
-    # Seeds secundários
-    seeds_dir = Path(repo_base_dir) / "seeds"
-    if seeds_dir.is_dir():
-        for name in ("baseFloricultura.csv", "baseFatiados.csv", "baseFLV_normalizada.csv"):
-            _copy_if_missing(seeds_dir / name, dirs["data"] / name)
-
-    # Migração opcional sem o printers.csv
-    legacy_dir = Path(repo_base_dir)
-    for legacy in ("baseFloricultura.csv", "baseFatiados.csv"):
-        legacy_path = legacy_dir / legacy
-        if legacy_path.exists():
-            dst = dirs["data"] / legacy
-            if not dst.exists():
-                _copy_if_missing(legacy_path, dst)
-
     return dirs
 

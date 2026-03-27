@@ -360,3 +360,34 @@ def delete_template(filename):
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": f"Erro ao excluir: {str(e)}"}), 500
+
+# ==========================================
+# Logs de Auditoria (Nível 3)
+# ==========================================
+@bp.route("/logs/audit", methods=["GET", "OPTIONS"])
+@require_admin_nivel(3)
+def get_audit_logs():
+    """Retorna as ultimas 500 linhas de logs de auditoria."""
+    if request.method == "OPTIONS":
+        return "", 204
+        
+    audit_file = current_app.config["DIRS"]["logs"] / "audit.jsonl"
+    if not audit_file.exists():
+        return jsonify([])
+        
+    logs = []
+    try:
+        import json
+        with audit_file.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        logs.append(json.loads(line))
+                    except:
+                        pass
+        # Reverte para os mais recentes primeiro, limitando a 500
+        logs.reverse()
+        return jsonify(logs[:500])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

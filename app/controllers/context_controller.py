@@ -115,13 +115,22 @@ async def search_products():
     except (ValueError, TypeError):
         return {"erro": "Erro na busca Filial "}, 400
     
+    res = None
     if search_type == "descricao":
-        resultados = await productService.buscar_por_descricao(cod_empresa, query)
-        products = [ProductMapper.to_dto(r).to_dict() for r in resultados]
+        res = await productService.buscar_por_descricao(cod_empresa, query)
     else:
-        rec = await productService.buscar_por_codigo(cod_empresa, query)
-        if rec:
-            products = [ProductMapper.to_dto(rec).to_dict()]
+        res = await productService.buscar_por_codigo(cod_empresa, query)
+        
+    if res and res.sucesso:
+        # A API pode retornar a lista direto em res.dados ou aninhada em res.dados["dados"]
+        dados_brutos = res.dados.get("dados", []) if isinstance(res.dados, dict) else res.dados
+        
+        # Garante que seja iteravel
+        iteravel = dados_brutos if isinstance(dados_brutos, list) else [dados_brutos]
+        
+        for p_dict in iteravel:
+            if isinstance(p_dict, dict):
+                products.append(ProductMapper.to_dto(p_dict).to_dict())
 
     return jsonify({
         "products": products,

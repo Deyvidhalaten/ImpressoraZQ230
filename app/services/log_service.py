@@ -131,15 +131,22 @@ def log_stats(loja: str, modo: str, copies: int):
 # Logs de auditoria — registra JSON e arquivo audit.jsonl
 # ---------------------------------------------------------
 def log_audit(action: str, **meta):
+    ctx_meta = _with_request_context(meta)
+    
     if AUDIT_LOGGER:
-        AUDIT_LOGGER.info(action, extra=_with_request_context(meta))
+        AUDIT_LOGGER.info(action, extra=ctx_meta)
 
-    # salva JSON por linha
-    if "trace" in meta and AUDIT_JSONL:
+    # sempre salva JSON por linha para expor pro frontend
+    if AUDIT_JSONL:
         try:
+            from datetime import datetime
+            record = ctx_meta.copy()
+            record["action"] = action
+            record["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
             AUDIT_JSONL.parent.mkdir(parents=True, exist_ok=True)
             with AUDIT_JSONL.open("a", encoding="utf-8") as f:
-                f.write(json.dumps(meta["trace"], ensure_ascii=False) + "\n")
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
         except Exception:
             pass
 
