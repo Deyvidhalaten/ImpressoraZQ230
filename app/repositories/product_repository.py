@@ -30,7 +30,7 @@ class ProductRepository:
         try:
             async with ClientSession(headers=self.headers, connector=connector) as session:
                 #  Utilizo a base_url vinda do .env
-                url = f"{self.base_url}/produtos/consultar" 
+                url = f"{self.base_url}/c5/it" 
                 
                 async with session.post(url, json=payload, timeout=10) as response:
                     if response.status == 200:

@@ -27,7 +27,7 @@
         "PYTHONUNBUFFERED": "1"
       }
     },
-        {
+    {
       "name": "Debug API (Script)",
       "type": "debugpy",
       "request": "launch",
@@ -38,6 +38,22 @@
       "env": {
         "PYTHONUNBUFFERED": "1"
       }
+    },
+    {
+      "name": "Debug Frontend (Chrome)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://10.4.30.2:8000/frontend",
+      "webRoot": "${workspaceFolder}"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full Stack Debug",
+      "configurations": [
+        "Run App (module: app)",
+        "Debug Frontend (Chrome)"
+      ]
     }
   ]
 }

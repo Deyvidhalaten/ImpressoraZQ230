@@ -163,10 +163,10 @@ async function fetchContext() {
     }
 }
 
-async function searchProducts(query, type = 'codigo') {
+async function searchProducts(query) {
     try {
         const response = await fetch(
-            `${API_BASE}/search?q=${encodeURIComponent(query)}&type=${type}&modo=${state.currentMode}`,
+            `${API_BASE}/search?q=${encodeURIComponent(query)}&type=${state.searchType}&modo=${state.currentMode}`,
             { method: 'GET', headers: { 'Content-Type': 'application/json' } }
         );
 
@@ -451,7 +451,7 @@ function setupEventListeners() {
         // Se não tem produto selecionado, ou se o código mudou -> BUSCAR
         if (!state.selectedProduct || state.selectedProduct.codprod !== codigo) {
             // Realiza busca
-            const result = await searchProducts(codigo, 'codigo');
+            const result = await searchProducts(codigo, state.searchProducts);
 
             if (result.products.length === 0) {
                 showToast('error', 'Não encontrado', 'Produto não encontrado');
