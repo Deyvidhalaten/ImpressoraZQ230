@@ -67,23 +67,36 @@ def print_label():
     #db = current_app.config["DB_FLV"] if dto.modo == "flv" or "padaria" else current_app.config["DB"]
     try:
         client_ip = request.remote_addr
-        if f_service: 
-            cod_empresa = f_service.encontra_filial_por_ip(client_ip)
-
-        if not cod_empresa:
-            return {"erro": "Erro na busca Filial"}, 400
+        rec = None
         
-        rec = asyncio.run(service.buscar_por_codigo(cod_empresa, dto.codigo))
-        if not rec:
-            return jsonify({"success": False, "error": "Produto não identificado"}), 404
-        #rec = asyncio.run(service.buscar_por_codigo(cod_empresa, dto.codigo))
-        trace.add("consulta_db_result", found=bool(rec))
+        # Bypass DB Query se o Frontend enviou o DTO preenchido em cache
+        if hasattr(dto, 'produto_dados') and dto.produto_dados:
+            rec = dto.produto_dados
+            trace.add("cache_frontend", hit=True)
+        else:
+            if is_test:
+                cod_empresa = 175
+            elif f_service: 
+                cod_empresa = f_service.encontra_filial_por_ip(client_ip)
+            else:
+                cod_empresa = None
+
+            if not cod_empresa:
+                return jsonify({"success": False, "error": "Falta de IP ou Base de Filiais Offline (ative o modo teste)"}), 400
+            
+            res_api = asyncio.run(service.buscar_por_codigo(cod_empresa, dto.codigo))
+            if res_api and hasattr(res_api, 'sucesso') and res_api.sucesso:
+                dados_brutos = res_api.dados.get("dados", []) if isinstance(res_api.dados, dict) else res_api.dados
+                lista = dados_brutos if isinstance(dados_brutos, list) else [dados_brutos]
+                rec = lista[0] if lista else None
+
+            trace.add("consulta_db_result", found=bool(rec))
     except Exception as e:
         trace.add("consulta_db_erro", erro=str(e))
-        log_error("Erro DB", erro=str(e))
+        log_error("Erro DB/Cache", erro=str(e))
         dados = trace.finish("erro")
         log_audit("impressao_falha", trace=dados)
-        return jsonify({"success": False, "error": "Erro ao consultar banco"}), 500
+        return jsonify({"success": False, "error": "Erro ao consultar banco ou ler cache"}), 500
 
     if not rec:
         trace.add("produto_nao_encontrado", codigo=dto.codigo)
@@ -103,11 +116,22 @@ def print_label():
     
     template_path = current_app.config["DIRS"]["templates"] / tpl
     
-    nutri_obj = rec.get("nutri") or {} 
+    nutri_obj = {
+        "porcao": rec.get("PORCAO", ""),
+        "kcal": rec.get("VL_CAL_100", rec.get("VL_CALORICO", "")),
+        "carb": rec.get("VL_CARBOIDRATOS_100", rec.get("CARBOIDRATOS", "")),
+        "prot": rec.get("VL_PROTEINAS_100", rec.get("PROTEINAS", "")),
+        "gord": rec.get("VL_GORD_TOT_100", rec.get("GOR_TOT", "")),
+        "sat": rec.get("VL_GORD_SAT_100", rec.get("GOR_SAT", "")),
+        "trans": rec.get("VL_GORD_TRANS_100", rec.get("GOR_TRANS", "")),
+        "fibra": rec.get("VL_FIBRA_100", rec.get("FIBRA", "")),
+        "sodio_mg": rec.get("VL_SODIO_100", rec.get("SODIO", "")),
+    } if "VL_CAL_100" in rec or "VL_CALORICO" in rec else (rec.get("nutri") or {})
+    
     nutri_list = [nutri_obj] if nutri_obj else []
 
     # Lógica de EAN Dinâmico
-    ean_raw = str(rec.get("ean") or "")
+    ean_raw = str(rec.get("ean") or rec.get("EAN") or "")
     ean_final = ean_raw
     tipoean = "BE"
 
@@ -116,24 +140,39 @@ def print_label():
         if len(ean_raw) < 12:
             ean_final = ean_raw.zfill(12)
 
-    dias_para_adicionar = rec.get("validade")
-    data = date.today()
-    dataobj = data + timedelta(days=dias_para_adicionar)
-    dataValidade = dataobj.strftime("%d/%m/%Y")
+    val_dias = rec.get("validade") or 0
+    data_hoje = date.today()
+    
+    try:
+        val_dias_int = int(val_dias)
+        dataobj = data_hoje + timedelta(days=val_dias_int)
+        dataValidade = dataobj.strftime("%d/%m/%Y")
+    except:
+        # Tenta pegar DT_VALIDADE (que já é string em formato brasileiro da BAPI)
+        dataValidade = rec.get("DT_VALIDADE", "")
+        
+    codprod = str(rec.get('codprod') or rec.get('CODPROD') or rec.get('SEQPRODUTO') or '')
+    descricao = str(rec.get('descricao') or rec.get('DESCRICAO') or '')
+
     ctx = {
         "tipoean": tipoean,
         "modo": dto.modo,
-        "texto": rec["descricao"][:27],
-        "codprod": rec["codprod"],
+        "texto": descricao[:27],
+        "codprod": codprod,
         "ean": ean_final,
         "copies": dto.copies,
         "ls": loja_map.get("ls", {}).get(dto.modo, 0),
         "data": datetime.now().strftime("%d/%m/%Y"),
-        "validade": rec.get("validade"),
+        "validade": val_dias,
         "infnutri": nutri_list,
         "nutri": nutri_obj,
         "dataValidade": dataValidade,
     }
+    
+    # Merge de todas as variáveis cruas na raiz do JINJA para flexibilidade nos ZPLs
+    for k, v in rec.items():
+        if k not in ctx:
+            ctx[k] = v
 
     try:
         if tpl.endswith(".zpl"):

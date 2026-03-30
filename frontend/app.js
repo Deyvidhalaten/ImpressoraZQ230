@@ -193,6 +193,10 @@ async function sendPrint(codigo, copies, printerIp) {
             printer_ip: printerIp
         };
 
+        if (state.selectedProduct && state.selectedProduct.codprod === codigo && state.selectedProduct.full_data) {
+            body.produto_dados = state.selectedProduct.full_data;
+        }
+
         // DEBUG
         console.log('[DEBUG sendPrint] URL:', url);
         console.log('[DEBUG sendPrint] Body:', JSON.stringify(body));

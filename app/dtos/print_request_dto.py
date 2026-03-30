@@ -8,6 +8,7 @@ class PrintRequestDTO:
     copies: int
     printer_ip: Optional[str] = None
     template: Optional[str] = None
+    produto_dados: Optional[dict] = None
 
     @classmethod
     def from_dict(cls, data: dict) -> "PrintRequestDTO":
@@ -25,7 +26,8 @@ class PrintRequestDTO:
             codigo=codigo,
             copies=copies,
             printer_ip=data.get("printer_ip"),
-            template=data.get("template")
+            template=data.get("template"),
+            produto_dados=data.get("produto_dados")
         )
 
     def is_valid(self) -> bool:

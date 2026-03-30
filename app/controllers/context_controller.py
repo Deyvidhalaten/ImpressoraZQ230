@@ -106,14 +106,20 @@ async def search_products():
     #db = current_app.config["DB_FLV"] if modo == "flv" or "padaria" else current_app.config["DB"]
     products = []
     try:
+        from app.services.printing_service import _is_test_mode
         client_ip = request.remote_addr
-        if f_service: 
+        is_test = _is_test_mode() or client_ip in ("127.0.0.1", "::1", "localhost")
+        
+        cod_empresa = None
+        if is_test:
+            cod_empresa = 175
+        elif f_service: 
             cod_empresa = f_service.encontra_filial_por_ip(client_ip)
 
         if not cod_empresa:
-            return {"erro": "Erro na busca Filial"}, 400
+            return {"erro": "Falta de IP ou Base de Filiais Offline (ative o modo teste)"}, 400
     except (ValueError, TypeError):
-        return {"erro": "Erro na busca Filial "}, 400
+        return {"erro": "Erro genérico na busca de Filial"}, 400
     
     res = None
     if search_type == "descricao":
