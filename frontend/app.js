@@ -342,6 +342,8 @@ function setSearchType(type) {
 // Product Selection
 // ============================================
 function selectProduct(product) {
+    selectedProduct = product;
+    console.log("Produto completo carregado:", product.full_data);
     state.selectedProduct = product;
     elements.selectedProductName.textContent = product.descricao;
     elements.selectedProductCode.textContent = `Código: ${product.codprod} | EAN: ${product.ean}`;

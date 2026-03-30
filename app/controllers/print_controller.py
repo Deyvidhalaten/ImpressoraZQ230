@@ -11,19 +11,18 @@ from app.services.printing_service import enviar_para_impressora_ip, _is_test_mo
 from app.services.templates_service import list_templates_by_mode, render_zpl
 from app.services.log_service import log_audit, log_error, log_stats
 from app.services.trace_service import start_trace
+from app.dtos.print_request_dto import PrintRequestDTO
 
 bp = Blueprint("print_controller", __name__, url_prefix="/api")
 
 @bp.route("/print", methods=["POST", "OPTIONS"])
 def print_label():
-    service = ProductService()
-    f_service: FilialService = current_app.config.get('FILIAL_SERVICE_INSTANCIA')
-    """Recebe JSON e envia para impressora (ou simula)."""
+    service = current_app.config.get('PRODUCT_SERVICE')
     if request.method == "OPTIONS":
         return "", 204
 
-    from app.dtos.print_request_dto import PrintRequestDTO
-    
+    f_service: FilialService = current_app.config.get('FILIAL_SERVICE_INSTANCIA')
+    """Recebe JSON e envia para impressora (ou simula)."""
     data = request.get_json(force=True)
     dto = PrintRequestDTO.from_dict(data)
 
@@ -75,6 +74,9 @@ def print_label():
             return {"erro": "Erro na busca Filial"}, 400
         
         rec = asyncio.run(service.buscar_por_codigo(cod_empresa, dto.codigo))
+        if not rec:
+            return jsonify({"success": False, "error": "Produto não identificado"}), 404
+        #rec = asyncio.run(service.buscar_por_codigo(cod_empresa, dto.codigo))
         trace.add("consulta_db_result", found=bool(rec))
     except Exception as e:
         trace.add("consulta_db_erro", erro=str(e))
