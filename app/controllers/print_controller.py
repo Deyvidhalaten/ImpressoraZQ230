@@ -206,5 +206,5 @@ def print_label():
         "success": sucesso,
         "message": f"{dto.copies} etiqueta(s) enviadas" if sucesso else "Falha ao enviar",
         "printer_ip": dto.printer_ip,
-        "produto": rec["descricao"],
+        "produto": rec["DESCRICAO"],
     })

@@ -33,5 +33,5 @@ class ProductService:
             loja=cod_empresa, 
             ean="", 
             seq="", 
-            nome=termo.upper()
+            nome=termo.lower()
         )
