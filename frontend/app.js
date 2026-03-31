@@ -23,9 +23,7 @@ const state = {
 // ============================================
 // Se estamos acessando pela porta 8000 (servidor Flask), usamos /api relativo
 // Caso contrário (Live Server, etc), usamos URL absoluta
-const API_BASE = window.location.port === '8000'
-    ? '/api'
-    : 'http://localhost:8000/api';
+const API_BASE = '';
 
 // ============================================
 // DOM Elements
@@ -111,10 +109,7 @@ async function fetchContext() {
     try {
         updateStatus('', 'Conectando...');
 
-        const response = await fetch(`${API_BASE}/context`, {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' }
-        });
+        const response = await fetch(`${API_BASE}/api/context`);
 
         if (!response.ok) {
             const error = await response.json();

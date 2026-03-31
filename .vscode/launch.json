@@ -43,7 +43,7 @@
       "name": "Debug Frontend (Chrome)",
       "type": "chrome",
       "request": "launch",
-      "url": "http://192.168.0.188:8000/frontend",
+      "url": "https://10.4.30.2",
       "webRoot": "${workspaceFolder}"
     }
   ],

@@ -17,6 +17,7 @@ from app.services.templates_service import criar_ambiente_zpl
 from app.services.auth_service import init_users_file
 from app.repositories.printer_repository import load_printer_map_from
 from app.services.product_service import ProductService
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Blueprints
 from app.controllers.auth_controller import bp as auth_bp
@@ -106,7 +107,7 @@ app.secret_key = SECRET_KEY
 app.permanent_session_lifetime = PERMANENT_SESSION_LIFETIME
 app.config["DIRS"] = DIRS
 app.config["ZPL_ENV"] = criar_ambiente_zpl(DIRS["templates"])
-
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 # 4. INSTANCIAÇÃO DOS SERVIÇOS COM DADOS PROTEGIDOS
 filial_repo = FilialRepository(base_url=bapi_url, token=token_ad)
 servico_filiais = FilialService(filial_repo)
