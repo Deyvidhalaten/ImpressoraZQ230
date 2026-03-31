@@ -4,6 +4,7 @@ from flask import Blueprint, request, jsonify, current_app
 from app.repositories.printer_repository import load_printer_map_from
 from app.services.filial_service import FilialService
 from app.services.printing_service import _is_test_mode
+from app.services.security_service import SecurityService
 from app.services.templates_service import list_templates_by_mode
 from app.services.product_service import ProductService
 from app.dtos.context_response_dto import ContextResponseDTO, PrinterResponseDTO, ModosResponseDTO
@@ -78,8 +79,10 @@ def context():
 @bp.route("/search", methods=["GET", "OPTIONS"])
 async def search_products():
     f_service: FilialService = current_app.config.get('FILIAL_SERVICE_INSTANCIA')
+    security = SecurityService()
     bapi_url = os.getenv("BSTK_BAPI")
-    token = os.getenv("TOKEN_AD")
+    token_sujo = os.getenv("TOKEN_AD")
+    token = security.decrypt_data(token_sujo)
     productService = ProductService(client_api=bapi_url, token=token)
 
     if f_service is None:
