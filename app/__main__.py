@@ -39,27 +39,35 @@ if "--setup" in sys.argv:
     print("🔒 BISTEK PRINTER - CONFIGURAÇÃO DE AMBIENTE SEGURO")
     print("="*60)
     
-    # A. Tranca a pasta da chave mestra (ProgramData)
     if security.lock_vault_folder():
-        print("✅ Cofre de chaves trancado com permissões SISTEMA/ADMIN.")
-    
-    # B. Define a URL da API BAPI (Fixa conforme solicitado)
+        print("✅ Cofre de chaves trancado.")
+
     url_bapi = "https://api.bistek.com.br"
     security.update_env_file("BSTK_BAPI", url_bapi)
-    print(f"✅ API configurada: {url_bapi}")
     
-    # C. Solicita, criptografa e salva o Token AD
-    token_puro = input("\nDigite o TOKEN AD de Produção: ").strip()
+    # --- AJUSTE AQUI: Tenta pegar o token do comando primeiro ---
+    token_puro = None
+    if "--token" in sys.argv:
+        try:
+            # Pega o próximo item após o "--token"
+            idx = sys.argv.index("--token")
+            token_puro = sys.argv[idx + 1]
+        except (ValueError, IndexError):
+            pass
+
+    # Se não veio via argumento, tenta o input (só funcionará se base=None no setup.py)
+    if not token_puro:
+        try:
+            token_puro = input("\nDigite o TOKEN AD de Produção: ").strip()
+        except EOFError:
+            print("\n❌ Erro: Não foi possível ler o input. Use o parâmetro --token.")
+            sys.exit(1)
     
     if token_puro:
         token_crip = security.encrypt_data(token_puro)
         security.update_env_file("TOKEN_AD", token_crip)
-        print("\n✅ Token criptografado e salvo com sucesso!")
-        print(f"📁 Arquivo gerado em: {security.env_path}")
-    else:
-        print("\n⚠️  Aviso: Nenhum token foi inserido. O sistema não funcionará.")
+        print("\n✅ Token configurado com sucesso!")
     
-    print("="*60 + "\n")
     sys.exit(0)
 
 # --- MODO SERVIDOR: EXECUÇÃO NORMAL ---

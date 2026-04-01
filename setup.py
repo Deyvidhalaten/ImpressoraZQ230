@@ -35,7 +35,7 @@ includefiles = [
     ("app/seeds", "app/seeds"),
     ("app/services", "app/services"),
     ("app/zpl_templates", "app/zpl_templates"),
-    ("frontend", "frontend"),
+    #("frontend", "frontend"),
 ]
 
 # DLLs do pywin32
@@ -79,7 +79,7 @@ build_exe_options = {
 # -------------------------------------------------------------------
 # Define modo GUI (sem console)
 # -------------------------------------------------------------------
-base = "Win32GUI" if sys.platform == "win32" else None
+base = None
 
 # -------------------------------------------------------------------
 # Criação do executável
