@@ -680,7 +680,15 @@ function renderTemplatesList() {
 window.loadTemplateEditor = function(filename) {
     state.currentTemplate = filename;
     elements.tplFilename.value = filename;
-    elements.tplContent.value = state.templates[filename];
+    
+    const tplData = state.templates[filename] || {};
+    elements.tplContent.value = typeof tplData === 'string' ? tplData : (tplData.content || '');
+    
+    const cbExtras = document.getElementById('tplPermitirCamposExtras');
+    if (cbExtras) {
+        cbExtras.checked = tplData.permitir_campos_extras || false;
+    }
+
     elements.btnDeleteTemplate.style.display = 'inline-block';
     renderTemplatesList(); // re-draw colors
 };
@@ -689,6 +697,10 @@ elements.btnNewTemplate?.addEventListener('click', () => {
     state.currentTemplate = 'novo_modal.zpl.j2';
     elements.tplFilename.value = 'novo_modal.zpl.j2';
     elements.tplContent.value = '^XA\n// Digite seu ZPL Jinja aqui\n^XZ';
+    
+    const cbExtras = document.getElementById('tplPermitirCamposExtras');
+    if (cbExtras) cbExtras.checked = false;
+    
     elements.btnDeleteTemplate.style.display = 'none';
     renderTemplatesList();
 });
@@ -697,10 +709,17 @@ elements.btnSaveTemplate?.addEventListener('click', async () => {
     const filename = elements.tplFilename.value.trim();
     if (!filename) return showToast('error', 'Erro', 'Dê um nome ao arquivo (ex: funcao.zpl.j2)');
     try {
+        const cbExtras = document.getElementById('tplPermitirCamposExtras');
+        const permitir = cbExtras ? cbExtras.checked : false;
+        
         const res = await fetch(`${API_BASE}/templates`, {
             method: 'POST',
             headers: authHeaders,
-            body: JSON.stringify({ filename, content: elements.tplContent.value })
+            body: JSON.stringify({ 
+                filename: filename, 
+                content: elements.tplContent.value,
+                permitir_campos_extras: permitir
+            })
         });
         const data = await res.json();
         if(data.success) {

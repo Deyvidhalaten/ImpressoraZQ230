@@ -166,8 +166,14 @@
                         </div>
                         
                         <div class="card" style="flex: 3; min-width: 400px; display: flex; flex-direction: column;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                                <input type="text" id="tplFilename" class="form-input" placeholder="ex: floricultura.zpl.j2" style="max-width: 300px; font-weight: bold;">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                                <div style="display: flex; flex-direction: column; gap: 0.3rem;">
+                                    <input type="text" id="tplFilename" class="form-input" placeholder="ex: floricultura.zpl.j2" style="max-width: 300px; font-weight: bold;">
+                                    <label style="display: flex; align-items: center; font-size: 0.85em; cursor: pointer; color: var(--text-secondary);">
+                                        <input type="checkbox" id="tplPermitirCamposExtras" style="margin-right: 0.3rem;">
+                                        Permitir Inputs Extras no Frontend (Para esse modelo)
+                                    </label>
+                                </div>
                                 <div>
                                     <button class="btn btn-secondary btn-small" id="btnDeleteTemplate" style="background: var(--danger-color); border:none; color:white; display:none;">🗑️ Excluir</button>
                                     <button class="btn btn-primary btn-small" id="btnSaveTemplate">💾 Salvar Alterações</button>

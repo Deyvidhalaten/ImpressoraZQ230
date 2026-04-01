@@ -60,10 +60,15 @@ def context():
         ) for p in printers
     ]
 
-    modos_dto = [
-        ModosResponseDTO(key=k, label=v) 
-        for k, v in sorted(modos_mapeados.items())
-    ]
+    # Injeta a permissão de campos extras de cada modo iterando o meta default
+    from app.services.templates_service import get_template_meta
+    meta_db = get_template_meta(current_app.config["DIRS"]["templates"])
+    
+    modos_dto = []
+    for k, v in sorted(modos_mapeados.items()):
+        tpl_name = f"{k}_default.zpl.j2"
+        permitir = meta_db.get(tpl_name, {}).get("permitir_campos_extras", False)
+        modos_dto.append(ModosResponseDTO(key=k, label=v, permitir_extras=permitir))
 
     response_dto = ContextResponseDTO(
         loja=loja_map["loja"],

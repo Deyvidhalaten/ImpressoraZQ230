@@ -4,6 +4,7 @@ from pathlib import Path
 import math
 from typing import Dict, List, Optional
 import re
+import json
 
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 
@@ -124,6 +125,28 @@ def listar_templates_por_modo(templates_dir: Path) -> Dict[str, List[str]]:
 
     log_audit("templates_scanned", dir=str(templates_dir), qtd_arquivos=len(found_files), files=found_files, modos_extraidos=list(modos.keys()))
     return modos
+
+def get_template_meta(templates_dir: Path) -> dict:
+    """Busca os metadados das Etiquetas (ex: permitir_campos_extras)."""
+    meta_path = templates_dir / "template_meta.json"
+    if not meta_path.exists():
+        return {}
+    try:
+        with meta_path.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_template_meta(templates_dir: Path, template_name: str, permitir_extras: bool):
+    """Salva a flag de campos extras para o template ZPL específico."""
+    meta = get_template_meta(templates_dir)
+    if template_name not in meta:
+        meta[template_name] = {}
+    meta[template_name]["permitir_campos_extras"] = bool(permitir_extras)
+    
+    meta_path = templates_dir / "template_meta.json"
+    with meta_path.open("w", encoding="utf-8") as f:
+        json.dump(meta, f, indent=4)
 
 
 def criar_ambiente_zpl(templates_dir: Path) -> Environment:

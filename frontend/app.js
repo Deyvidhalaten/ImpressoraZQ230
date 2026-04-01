@@ -192,6 +192,18 @@ async function sendPrint(codigo, copies, printerIp) {
             body.produto_dados = state.selectedProduct.full_data;
         }
 
+        // Epic 13: Extra Fields Data Collection
+        const c1 = document.getElementById('extraCampo1')?.value?.trim();
+        const c2 = document.getElementById('extraCampo2')?.value?.trim();
+        const c3 = document.getElementById('extraCampo3')?.value?.trim();
+        const c4 = document.getElementById('extraCampo4')?.value?.trim();
+        
+        body.campos_extras = {};
+        if (c1) body.campos_extras["CAMPO_1"] = c1;
+        if (c2) body.campos_extras["CAMPO_2"] = c2;
+        if (c3) body.campos_extras["CAMPO_3"] = c3;
+        if (c4) body.campos_extras["CAMPO_4"] = c4;
+
         // DEBUG
         console.log('[DEBUG sendPrint] URL:', url);
         console.log('[DEBUG sendPrint] Body:', JSON.stringify(body));
@@ -233,6 +245,9 @@ function renderContext() {
 
     // Printer select (depends on currentMode)
     updatePrinterOptions();
+    
+    // Epic 13: Atualiza visibilidade do form extra
+    toggleExtraFieldsPanel();
 }
 
 function renderModeTabs() {
@@ -276,10 +291,24 @@ function selectMode(newMode) {
     localStorage.setItem('bistekprinter_mode', state.currentMode);
     renderModeTabs();
     updatePrinterOptions();
+    toggleExtraFieldsPanel();
     // Limpa produto selecionado ao mudar modo
     clearSelectedProduct();
 }
 
+function toggleExtraFieldsPanel() {
+    const activeModo = state.modos.find(m => m.key === state.currentMode);
+    const panel = document.getElementById('extraFieldsPanel');
+    if (panel && activeModo) {
+        panel.style.display = activeModo.permitir_extras ? 'block' : 'none';
+        if (!activeModo.permitir_extras) {
+            ['extraCampo1', 'extraCampo2', 'extraCampo3', 'extraCampo4'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+        }
+    }
+}
 function updatePrinterOptions() {
     // Filtra impressoras pelo modo atual
     const availablePrinters = state.printers.filter(p =>

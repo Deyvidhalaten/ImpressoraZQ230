@@ -12,6 +12,7 @@ class PrinterResponseDTO:
 class ModosResponseDTO:
     key: str
     label: str
+    permitir_extras: bool = False
 
 @dataclass
 class ContextResponseDTO:
@@ -32,7 +33,7 @@ class ContextResponseDTO:
                     "ls": p.ls
                 } for p in self.printers
             ],
-            "modos": [{"key": m.key, "label": m.label} for m in self.modos],
+            "modos": [{"key": m.key, "label": m.label, "permitir_extras": getattr(m, 'permitir_extras', False)} for m in self.modos],
             "ls": self.ls,
             "test_mode": self.test_mode
         }

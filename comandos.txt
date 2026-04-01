@@ -1,56 +1,99 @@
-# -------------------------------------------------------------
-# DEPENDÊNCIAS DO PROJETO (Atualizadas em 2026)
-# -------------------------------------------------------------
-# Dependências principais usadas no código atual:
-pip install flask                     # Web framework (inclui werkzeug e itsdangerous)
-pip install waitress                  # Servidor WSGI para produção
-pip install pywin32                   # Comunicação nativa com a impressora no Windows
-pip install Pillow                    # Manipulação de imagens (PIL) para geração de ZPL
-pip install cx_Freeze                 # Empacota o app em executável Windows (.exe)
-pip install requests                  # Usado para testes unitários no projeto
-pip install aiohttp                   # 
-pip install cryptography==45.0.6
-pip install pydantic
-pip install "flask[async]"
-pip install python-dotenv
-pip install oauthlib==3.3.1
-pip install cryptography
+=============================================================
+MANUAL DE ARQUITETURA E DEPLOY - BISTEK PRINTER
+=============================================================
 
-# Caso de erro ao instalar o waitress (pode ser a versão do python ou regra AD):
-pip install --no-binary :all: waitress
+Este documento consolida as diretrizes definitivas de infraestrutura, desde a inicialização do ambiente de desenvolvimento local até a implantação em produção (terminais de loja).
 
-# Dependências Antigas / Obsoletas (Podem ser ignoradas):
-# - pyinstaller (substituído pelo cx_Freeze)
-# - windows-curses (não é mais referenciado no código)
+-------------------------------------------------------------
+1. ARQUITETURA DE DESENVOLVIMENTO LOCAL (DEV MODE)
+-------------------------------------------------------------
+No desenvolvimento local, o uso do Nginx NÃO é necessário. Toda a comunicação ocorre via proxy nativo do Frontend conectando-se diretamente ao Python.
 
-# -------------------------------------------------------------
-# COMANDOS PARA RODAR O PROJETO
-# -------------------------------------------------------------
-# Rodar Localmente em modo de desenvolvimento:
-python app.py
+Passo a Passo (Inicialização Local):
+A) Inicie a API Python:
+   1. Abra o VS Code.
+   2. Certifique-se de ativar o Ambiente Virtual (caso utilize).
+   3. Execute o script `app.py` diretamente, ou utilize o atalho de Debug "Run App (module: app)" configurado no VS Code (launch.json).
+   4. A API escutará nativamente em `http://127.0.0.1:8000`.
 
-# Rodar Servidor em LAN (Produção):
-waitress-serve --listen=10.17.30.2:8000 app:app
+B) Inicie o Frontend React (Vite):
+   1. Abra um terminal apontando para a pasta `frontend-react`.
+   2. Execute o comando de instalação de dependências (necessário apenas na primeira vez estrutural):
+      npm install
+   3. Execute o servidor de desenvolvimento:
+      npm run dev
+   4. O portal será acessível via `http://localhost:5173`. O Vite roteará silenciosamente as chamadas `/api/*` ao Backend (Python).
 
-# -------------------------------------------------------------
-# GERAÇÃO DO EXECUTÁVEL (BUILD)
-# -------------------------------------------------------------
-python setup.py build
+*Nota sobre a máquina do desenvolvedor*: Instalação do NodeJS 18+ LTS é obrigatória apenas para os desenvolvedores.
 
-# -------------------------------------------------------------
-# SOLUÇÕES DE PROBLEMAS E UTIILITÁRIOS
-# -------------------------------------------------------------
-# Salvar Certificado caso de erro SSL (Rede Corporativa / AD)
-setx PIP_CERT "C:\certs\corp-root.pem"
-setx REQUESTS_CA_BUNDLE "C:\certs\corp-root.pem"
-setx SSL_CERT_FILE "C:\certs\corp-root.pem"
+-------------------------------------------------------------
+2. CLUSTER DE PRODUÇÃO (LOJA/PDV)
+-------------------------------------------------------------
+Para fins de produção/lojas, geramos build do projeto de forma que as estações do varejo não precisem possuir Python, Nodemon ou compiladores.
 
-# Limpar cache do Python (__pycache__)
-python -m compileall -b .
-for /r %i in (__pycache__) do rmdir /s /q "%i"
+A estrutura requerida (Exemplo: C:\BistekPrinter\) deve conter as subpastas isoladas:
+C:\BistekPrinter\
+├── nginx\                  (Binários do Nginx Windows)
+├── api\                    (Executáveis Python compilados gerados pela pasta build)
+├── certs\                  (Arquivos SSL/TLS .pem corporativos)
+└── frontend-react\         (Arquivos estáticos de produção gerados pelo vite)
 
-# -------------------------------------------------------------
-# MODO DEBUG (VSCode)
-# -------------------------------------------------------------
-# Para rodar em modo DEBUG, configure o VSCode: (Ctrl + Shift + P) e escreva "Open launch.json"
-# Desta forma o debug estará apontando para a pasta correta.
+-------------------------------------------------------------
+3. ROTINAS DE GERAÇÃO DE BUILD (DEPLOY)
+-------------------------------------------------------------
+A) Geração do Payload Python (Backend):
+   Execute na raiz do terminal para higienizar cache e gerar o executável stand-alone:
+   >> python -m compileall -b .
+   >> python setup.py build
+   O conteúdo da pasta `build/exe.win-amd64...` corresponde à pasta `api` na infraestrutura da loja.
+
+B) Geração do Payload React (Frontend):
+   Abra o diretório `frontend-react` e execute:
+   >> npm run build
+   Uma pasta oculta chamada `dist/` será gerada. Transfira integralmente o conteúdo da pasta `dist/` para dentro do servidor de produção da Loja (pasta `frontend-react`).
+
+-------------------------------------------------------------
+4. CONFIGURAÇÃO DE SEGURANÇA E PROXY SERVER (NGINX)
+-------------------------------------------------------------
+Para tráfego seguro HTTP/HTTPS em produção, edite arquivo `C:\BistekPrinter\nginx\conf\nginx.conf`:
+
+   listen       443 ssl;
+   ssl_certificate      C:/BistekPrinter/certs/bistek.crt;
+   ssl_certificate_key  C:/BistekPrinter/certs/bistek.key;
+
+   # Resolução da API Backend Python
+   location /api/ {
+       proxy_pass http://127.0.0.1:8000;
+   }
+
+   # Resolução do Site Estático Vite-React
+   location / {
+       root C:/BistekPrinter/frontend-react;
+       index index.html;
+       try_files $uri $uri/ /index.html;
+   }
+
+-------------------------------------------------------------
+5. EXECUÇÃO SILENCIOSA DOS SERVIÇOS TIER
+-------------------------------------------------------------
+Crie um script .bat (`start_bistek.bat`) para auto-inicializar o serviço corporativo em Background na Loja cliente.
+
+   @echo off
+   cd C:\BistekPrinter\nginx
+   start nginx.exe
+
+   cd C:\BistekPrinter\api
+   start /B waitress-serve --listen=127.0.0.1:8000 app:app
+   exit
+
+-------------------------------------------------------------
+6. SEGURANÇA DO COFRE / CREDENCIAIS UAC
+-------------------------------------------------------------
+O aplicativo gerencia chaves mestre salvaguardando-as no AppData encriptado de usuário isolado. O bypass da obrigatoriedade do Administrador requer uma inicialização prévia:
+Na fase de implantação do terminal, acesse C:\BistekPrinter\api e execute: `app.exe --setup`.
+O Token persistirá de forma nativa e UAC Compliant no diretório `%LOCALAPPDATA%\BistekPrinter\Vault\`.
+
+=============================================================
+DEPENDÊNCIAS MATRIZ PROJETO ORIGINAL (PYTHON TIER)
+pip install flask waitress pywin32 Pillow cx_Freeze requests aiohttp cryptography==45.0.6 pydantic "flask[async]" python-dotenv oauthlib==3.3.1
+=============================================================

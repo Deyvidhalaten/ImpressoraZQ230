@@ -94,12 +94,28 @@ token_sujo = os.getenv("TOKEN_AD")
 token_ad = security.decrypt_data(token_sujo)
 print(f"DEBUG: Token descriptografado: [{token_ad}]")
 
-if not token_ad or not bapi_url:
+# Verifica se está rodando em Modo Teste Local
+is_test_mode = True
+try:
+    if (DIRS["config"] / "settings.json").exists():
+        import json
+        with open(DIRS["config"] / "settings.json", "r", encoding="utf-8") as f:
+            st = json.load(f)
+            is_test_mode = bool(st.get("is_test_mode", 0))
+except Exception:
+    pass
+
+if (not token_ad or not bapi_url) and not is_test_mode:
     print("\n" + "!"*60)
     print("ERRO CRÍTICO: Configurações de Token ou API ausentes no AppData.")
     print("Por favor, execute o comando: python -m app --setup")
     print("!"*60 + "\n")
     sys.exit(1)
+elif (not token_ad or not bapi_url) and is_test_mode:
+    print("\n" + "!"*60)
+    print("AVISO: Faltam tokens de API, mas o sistema subirá em MODO TESTE (is_test_mode=1)")
+    print("As consultas online vão falhar e usarão respostas Dummy (Ex: Loja 17).")
+    print("!"*60 + "\n")
 
 # --- FLASK APP SETUP ---
 app = Flask(__name__)

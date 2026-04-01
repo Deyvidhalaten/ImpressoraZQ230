@@ -174,6 +174,28 @@ def print_label():
         if k not in ctx:
             ctx[k] = v
 
+    # -------------------------------------------------------------
+    # Epic 13: Sobrescrita forçada de Campos Extras do Frontend
+    # -------------------------------------------------------------
+    import copy
+    
+    # 1. Verifica se o Template permite campos extras
+    templates_dir = current_app.config["DIRS"]["templates"]
+    permitir = False
+    try:
+        from app.services.templates_service import get_template_meta
+        meta_db = get_template_meta(templates_dir)
+        permitir = meta_db.get(tpl, {}).get("permitir_campos_extras", False)
+    except Exception:
+        pass
+
+    # 2. Se permitir, sobrescreve apenas os que vieram preenchidos
+    if permitir and dto.campos_extras:
+        for ex_key, ex_val in dto.campos_extras.items():
+            # Apenas sobrescreve se tiver algum valor digitado
+            if ex_val and str(ex_val).strip() != "":
+                ctx[ex_key] = str(ex_val).strip()
+
     try:
         if tpl.endswith(".zpl"):
             from app.services.templates_service import render_zpl_dynamico

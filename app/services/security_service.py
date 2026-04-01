@@ -5,9 +5,10 @@ from cryptography.fernet import Fernet
 
 class SecurityService:
     def __init__(self):
-        self.vault_dir = Path(os.environ.get('PROGRAMDATA', 'C:/ProgramData')) / "BistekPrinter"
+        # Movido do C:\ProgramData para LOCALAPPDATA para rodar 100% sem Admin (UAC Block)
+        self.vault_dir = Path(os.environ.get('LOCALAPPDATA', 'C:/')) / "BistekPrinter" / "Vault"
         self.key_path = self.vault_dir / "secret.key"
-        self.env_path = Path(os.environ.get('LOCALAPPDATA', '')) / "BistekPrinter" / ".env"
+        self.env_path = Path(os.environ.get('LOCALAPPDATA', 'C:/')) / "BistekPrinter" / ".env"
         self.vault_dir.mkdir(parents=True, exist_ok=True)
         self.env_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -25,19 +26,9 @@ class SecurityService:
             return f.read()
 
     def lock_vault_folder(self):
-        path_str = str(self.vault_dir)
-        try:
-            # Remove herança de usuários comuns
-            subprocess.run(["icacls", path_str, "/inheritance:r"], check=True, capture_output=True)
-            # F = Controle Total | (OI) = Object Inherit | (CI) = Container Inherit
-            # SISTEMA
-            subprocess.run(["icacls", path_str, "/grant:r", "SISTEMA:(OI)(CI)F"], check=True)
-            # ADMINISTRADORES
-            subprocess.run(["icacls", path_str, "/grant:r", "*S-1-5-32-544:(OI)(CI)F"], check=True)
-            return True
-        except Exception as e:
-            print(f"Erro ao trancar pasta: {e}")
-            return False
+        # A pasta LOCALAPPDATA já é bloqueada nativamente pelo Windows para outros usuários.
+        # Desativamos o icacls pois ele dispara o alerta de necessidade de Administrador na instalação corporativa.
+        return True
 
     def encrypt_data(self, plain_text: str) -> str:
         if not plain_text: return ""

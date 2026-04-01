@@ -289,7 +289,15 @@ def list_templates():
     if templates_dir.exists():
         for file_path in templates_dir.glob("*.zpl.j2"):
             with file_path.open("r", encoding="utf-8") as f:
-                templates[file_path.name] = f.read()
+                content = f.read()
+                permitir = False
+                try:
+                    from app.services.templates_service import get_template_meta
+                    meta_db = get_template_meta(templates_dir)
+                    permitir = meta_db.get(file_path.name, {}).get("permitir_campos_extras", False)
+                except Exception:
+                    pass
+                templates[file_path.name] = {"content": content, "permitir_campos_extras": permitir}
                 
     return jsonify(templates)
 
@@ -327,6 +335,13 @@ def save_template():
     
     with file_path.open("w", encoding="utf-8") as f:
         f.write(content)
+        
+    try:
+        permitir = bool(data.get("permitir_campos_extras", False))
+        from app.services.templates_service import save_template_meta
+        save_template_meta(templates_dir, filename, permitir)
+    except Exception:
+        pass
         
     log_audit("template_saved", ip=request.remote_addr, detalhes=f"filename={filename}")
     

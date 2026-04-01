@@ -40,11 +40,18 @@
       }
     },
     {
-      "name": "Debug Frontend (Chrome)",
+      "name": "Debug Vite React (Chrome)",
       "type": "chrome",
       "request": "launch",
-      "url": "https://10.4.30.2",
-      "webRoot": "${workspaceFolder}"
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/frontend-react/src"
+    },
+    {
+      "name": "Debug Frontend Antigo (Chrome)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://127.0.0.1:8000/frontend",
+      "webRoot": "${workspaceFolder}/frontend"
     }
   ],
   "compounds": [
@@ -52,7 +59,7 @@
       "name": "Full Stack Debug",
       "configurations": [
         "Run App (module: app)",
-        "Debug Frontend (Chrome)"
+        "Debug Vite React (Chrome)"
       ]
     }
   ]

@@ -120,6 +120,31 @@
                                     <!-- Options inseridas via JS -->
                                 </select>
                             </div>
+                        </div> <!-- .form-row -->
+
+                        <!-- EPIC 13: Extra Fields Form -->
+                        <div id="extraFieldsPanel" style="display: none; margin-bottom: 1.5rem; padding: 1rem; border: 1px dashed var(--border-color); border-radius: 8px; background-color: rgba(0,0,0,0.02);">
+                            <h4 style="margin-top: 0; font-size: 0.9em; color: var(--text-secondary); margin-bottom: 0.8rem;">Campos Adicionais Manuais</h4>
+                            <div class="form-row" style="margin-bottom: 0.8rem;">
+                                <div class="form-group" style="flex: 1;">
+                                    <label class="form-label" style="font-size: 0.8em;">Campo_1 (ex: validade)</label>
+                                    <input type="text" id="extraCampo1" class="form-input" placeholder="Sobrescrever...">
+                                </div>
+                                <div class="form-group" style="flex: 1;">
+                                    <label class="form-label" style="font-size: 0.8em;">Campo_2 (ex: preço)</label>
+                                    <input type="text" id="extraCampo2" class="form-input" placeholder="Sobrescrever...">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group" style="flex: 1;">
+                                    <label class="form-label" style="font-size: 0.8em;">Campo_3 (texto livre)</label>
+                                    <input type="text" id="extraCampo3" class="form-input" placeholder="Adicional...">
+                                </div>
+                                <div class="form-group" style="flex: 1;">
+                                    <label class="form-label" style="font-size: 0.8em;">Campo_4</label>
+                                    <input type="text" id="extraCampo4" class="form-input" placeholder="...">
+                                </div>
+                            </div>
                         </div>
 
                         <button type="submit" class="btn btn-primary btn-print" id="printBtn">
