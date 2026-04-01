@@ -1,7 +1,8 @@
 // config API
 const HOSTNAME = window.location.hostname;
 const IS_DEV = HOSTNAME === 'localhost' || HOSTNAME === '127.0.0.1';
-const API_BASE = IS_DEV ? 'http://127.0.0.1:8000/api' : `http://${HOSTNAME}:8000/api`;
+//const API_BASE = IS_DEV ? 'http://127.0.0.1:8000/api' : `http://${HOSTNAME}:8000/api`;
+const API_BASE = '/api';
 
 document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('loginForm');

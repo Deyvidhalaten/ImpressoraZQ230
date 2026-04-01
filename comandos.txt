@@ -97,3 +97,4 @@ O Token persistirá de forma nativa e UAC Compliant no diretório `%LOCALAPPDATA
 DEPENDÊNCIAS MATRIZ PROJETO ORIGINAL (PYTHON TIER)
 pip install flask waitress pywin32 Pillow cx_Freeze requests aiohttp cryptography==45.0.6 pydantic "flask[async]" python-dotenv oauthlib==3.3.1
 =============================================================
+taskkill /f /im BistekPrinter.exe /t

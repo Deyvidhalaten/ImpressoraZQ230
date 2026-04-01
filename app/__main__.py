@@ -94,13 +94,12 @@ init_loggers(
 # 3. CARGA DE CONFIGURAÇÕES (IGNORA A RAIZ DO PROJETO)
 # override=True garante que usemos apenas o arquivo da pasta 'config'
 load_dotenv(dotenv_path=security.env_path, override=True)
-
 bapi_url = os.getenv("BSTK_BAPI")
 token_sujo = os.getenv("TOKEN_AD")
 
 # Descriptografia para a memória RAM
 token_ad = security.decrypt_data(token_sujo)
-print(f"DEBUG: Token descriptografado: [{token_ad}]")
+
 
 # Verifica se está rodando em Modo Teste Local
 is_test_mode = True
@@ -136,8 +135,10 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 filial_repo = FilialRepository(base_url=bapi_url, token=token_ad)
 servico_filiais = FilialService(filial_repo)
 servico_produtos = ProductService(client_api=bapi_url, token=token_ad)
-
-app.config['PRODUCT_SERVICE'] = servico_produtos
+app.config['TOKEN_AD'] = token_ad
+app.config['BSTK_BAPI'] = bapi_url
+filial_repo = FilialRepository(base_url=bapi_url, token=token_ad)
+app.config['PRODUCT_SERVICE'] = ProductService(client_api=bapi_url, token=token_ad)
 app.config['FILIAL_SERVICE_INSTANCIA'] = servico_filiais
 
 # Sincronização inicial de filiais

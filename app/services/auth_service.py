@@ -13,6 +13,8 @@ from cryptography.fernet import Fernet
 
 from dotenv import load_dotenv
 
+from app.services.security_service import SecurityService
+
 load_dotenv()  # Carrega variaveis do .env local se existir
 
 def get_users_file() -> Path:
@@ -106,12 +108,16 @@ def require_admin_nivel(min_nivel: int):
 
 
 import os
-BAPI = os.getenv("BSTK_BAPI", "https://api.bistek.com.br")
-TOKEN = os.getenv("TOKEN_AD", "")
-HEADERS = {
-    "Authorization": f"Bearer {TOKEN}",
-    "Content-Type": "application/json",
-}
+#BAPI = os.getenv("BSTK_BAPI", "https://api.bistek.com.br")
+#TOKEN = os.getenv("TOKEN_AD", "")
+#security = SecurityService()
+#token_sujo = os.getenv("TOKEN_AD")
+#TOKEN = security.decrypt_data(token_sujo)
+#TOKEN = current_app.config.get('TOKEN_AD')
+#HEADERS = {
+#    "Authorization": f"Bearer {TOKEN}",
+#    "Content-Type": "application/json",
+#}
 
 
 class Autenticado(BaseModel):
@@ -121,8 +127,15 @@ class Autenticado(BaseModel):
 
 
 async def patch_bapi_autenticador(envio: dict) -> Autenticado:
-    if not TOKEN:
+    token_real = current_app.config.get('TOKEN_AD')
+    BAPI = os.getenv("BSTK_BAPI", "https://api.bistek.com.br")
+    if not token_real:
         return Autenticado(mensagem="Token não informado")
+    
+    HEADERS = {
+        "Authorization": f"Bearer {token_real}",
+        "Content-Type": "application/json",
+    }
 
     async with ClientSession(headers=HEADERS) as s:
         async with s.patch(f"{BAPI}/ad/autenticacao", json=envio, ssl=False) as r:
