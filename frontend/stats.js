@@ -3,9 +3,11 @@
  * Gráficos de consumo de etiquetas
  */
 
-const API_BASE = window.location.port === '5500' || window.location.port === '5501'
+/**const API_BASE = window.location.port === '5500' || window.location.port === '5501'
     ? 'http://localhost:8000/api'
     : '/api';
+*/
+const API_BASE = '/api';
 
 let lojaChart = null;
 let redeChart = null;

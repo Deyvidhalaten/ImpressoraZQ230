@@ -15,12 +15,6 @@ class ProductRepository:
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json"
         }
-        # DEBUG: Verifique se o token começa com "Bearer " ou se está limpo
-        print(f"DEBUG REPOSITORY: Token recebido tem {len(token) if token else 0} caracteres")
-        self.headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-        }
 
     async def consultar_produto(self, loja: int, ean: str = "", seq: str = "", nome: str = "") -> "RespostaAPI":
         payload = {

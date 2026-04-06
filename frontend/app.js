@@ -23,7 +23,7 @@ const state = {
 // ============================================
 // Se estamos acessando pela porta 8000 (servidor Flask), usamos /api relativo
 // Caso contrário (Live Server, etc), usamos URL absoluta
-const API_BASE = '';
+const API_BASE = '/api';
 
 // ============================================
 // DOM Elements
@@ -109,7 +109,7 @@ async function fetchContext() {
     try {
         updateStatus('', 'Conectando...');
 
-        const response = await fetch(`${API_BASE}/api/context`);
+        const response = await fetch(`${API_BASE}/context`);
 
         if (!response.ok) {
             const error = await response.json();
@@ -203,10 +203,6 @@ async function sendPrint(codigo, copies, printerIp) {
         if (c2) body.campos_extras["CAMPO_2"] = c2;
         if (c3) body.campos_extras["CAMPO_3"] = c3;
         if (c4) body.campos_extras["CAMPO_4"] = c4;
-
-        // DEBUG
-        console.log('[DEBUG sendPrint] URL:', url);
-        console.log('[DEBUG sendPrint] Body:', JSON.stringify(body));
 
         const response = await fetch(url, {
             method: 'POST',
@@ -371,7 +367,6 @@ function setSearchType(type) {
 // ============================================
 function selectProduct(product) {
     selectedProduct = product;
-    console.log("Produto completo carregado:", product.full_data);
     state.selectedProduct = product;
     elements.selectedProductName.textContent = product.descricao;
     elements.selectedProductCode.textContent = `Código: ${product.codprod} | EAN: ${product.ean}`;

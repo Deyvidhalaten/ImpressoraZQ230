@@ -146,7 +146,7 @@ print("🔄 Sincronizando rede de filiais...")
 try:
     sucesso_sync = asyncio.run(servico_filiais.sincronizar_rede())
     if sucesso_sync:
-        print(f"✅ Sucesso! {len(servico_filiais.mapa_ip_filial)} filiais carregadas.")
+        print("✅ Filiais carregadas.")
     else:
         print("⚠️  Aviso: Operando com base de filiais local/offline.")
 except Exception as e:

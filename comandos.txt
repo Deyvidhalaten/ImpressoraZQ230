@@ -53,7 +53,7 @@ B) Geração do Payload React (Frontend):
    Uma pasta oculta chamada `dist/` será gerada. Transfira integralmente o conteúdo da pasta `dist/` para dentro do servidor de produção da Loja (pasta `frontend-react`).
 
 -------------------------------------------------------------
-4. CONFIGURAÇÃO DE SEGURANÇA E PROXY SERVER (NGINX)
+4. CONFIGURAÇÃO DE SEGURANÇA E PROXY SERVER (NGINX) - Link para gerar Certificado https://github.com/filosottile/mkcert/releases
 -------------------------------------------------------------
 Para tráfego seguro HTTP/HTTPS em produção, edite arquivo `C:\BistekPrinter\nginx\conf\nginx.conf`:
 

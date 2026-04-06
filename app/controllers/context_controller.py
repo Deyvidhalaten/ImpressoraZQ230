@@ -84,11 +84,9 @@ def context():
 @bp.route("/search", methods=["GET", "OPTIONS"])
 async def search_products():
     f_service: FilialService = current_app.config.get('FILIAL_SERVICE_INSTANCIA')
-    security = SecurityService()
     bapi_url = os.getenv("BSTK_BAPI")
-    token_sujo = os.getenv("TOKEN_AD")
-    token = security.decrypt_data(token_sujo)
-    productService = ProductService(client_api=bapi_url, token=token)
+    token_real = current_app.config.get('TOKEN_AD')
+    productService = ProductService(client_api=bapi_url, token=token_real)
 
     if f_service is None:
         print("ERRO: filial_service não encontrado no config!")

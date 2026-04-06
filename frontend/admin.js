@@ -5,9 +5,11 @@
 
 // Se estamos acessando pela porta 8000 (servidor Flask), usamos /api relativo
 // Caso contrário (Live Server, etc), usamos URL absoluta
-const API_BASE = window.location.port === '8000'
+/**const API_BASE = window.location.port === '8000'
     ? '/api'
     : 'http://localhost:8000/api';
+    */
+const API_BASE = '/api';
 
 // --- Auth Verification ---
 const token = localStorage.getItem('adminToken');
