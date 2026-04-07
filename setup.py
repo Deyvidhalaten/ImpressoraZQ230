@@ -27,15 +27,7 @@ if os.path.isdir(pywin32_system32):
 # Arquivos adicionais do projeto
 # -------------------------------------------------------------------
 includefiles = [
-    ("app/controllers", "app/controllers"),
-    ("app/dtos", "app/dtos"),
-    ("app/mappers", "app/mappers"),
-    ("app/models", "app/models"),
-    ("app/repositories", "app/repositories"),
-    ("app/seeds", "app/seeds"),
-    ("app/services", "app/services"),
-    ("app/zpl_templates", "app/zpl_templates"),
-    #("frontend", "frontend"),
+    ("frontend", "frontend"),
 ]
 
 # DLLs do pywin32
@@ -51,19 +43,13 @@ build_exe_options = {
         "jinja2",
         "urllib3",
         "PIL",
-        "win32print",
-        "win32ui",
-        "win32com",
-        "pythoncom",
+        "waitress",
     ],
     "includes": [
-        "http",
         "http.client",
         "socket",
         "select",
         "queue",
-        "win32con",
-        "win32timezone",
     ],
     "include_files": includefiles,
     "include_msvcr": True,
@@ -71,7 +57,6 @@ build_exe_options = {
         "tkinter",
         "unittest",
         "email",
-        "http",
         "xml",
     ],
 }

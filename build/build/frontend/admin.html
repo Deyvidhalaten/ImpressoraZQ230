@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - BistekPrinter</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <img src="logo-bistek.png" alt="Bistek" class="logo-img">
+                </div>
+                <div class="user-info" style="color: white; font-weight: 500;">
+                    Nível de Acesso: <span id="userLevelBadge" style="background-color: var(--primary-color); padding: 0.2rem 0.6rem; border-radius: 4px;">1</span>
+                </div>
+                <nav class="header-nav" style="display: flex; align-items: center; gap: 1rem;">
+                    <a href="index.html" class="nav-link">🏷️ Impressão</a>
+                    <a href="stats.html" class="nav-link">📊 Estatísticas</a>
+                    <button class="btn btn-small btn-danger"
+                        onclick="shutdownSystem()"
+                        style="margin-left: 1rem; background-color: var(--danger-color); font-weight: bold;">⚠️ Desligar Serviço</button>
+                    <button class="btn btn-small btn-secondary"
+                        onclick="localStorage.removeItem('adminToken'); window.location.href='login.html'"
+                        style="margin-left: 1rem;">Sair</button>
+                </nav>
+            </div>
+            
+            <!-- ADMIN TABS (Role-based visibilities) -->
+            <div class="admin-tabs-container">
+                <button class="admin-tab-btn active" data-target="printersSection" id="tabPrinters">🖨️ Configura Impressora</button>
+                <button class="admin-tab-btn" data-target="usersSection" id="tabUsers" style="display: none;">👥 Cadastro Usuário & Loja</button>
+                <button class="admin-tab-btn" data-target="templatesSection" id="tabTemplates" style="display: none;">📄 Editor ZPL</button>
+                <button class="admin-tab-btn" data-target="auditSection" id="tabAudit" style="display: none;">🛡️ Auditoria Geral</button>
+            </div>
+        </header>
+
+        <main class="main-content">
+            
+            <!-- ============================================ -->
+            <!-- SECTION: IMPRESSORAS (Nível ≥ 1)               -->
+            <!-- ============================================ -->
+            <div id="printersSection" class="admin-view active">
+                <section class="admin-section" id="printersSectionContainer">
+                    <h2 class="section-title">Selecionar Impressora</h2>
+                    <div class="card" style="display: flex; gap: 1rem; align-items: flex-end;">
+                        <div class="form-group" style="flex: 1;">
+                            <label class="form-label">Minhas Lojas Permitidas</label>
+                            <select id="storeAdminSelect" class="form-select"></select>
+                        </div>
+                        <div class="form-group" style="flex: 2;">
+                            <label class="form-label">Impressoras da Loja Selecionada</label>
+                            <select id="printerAdminSelect" class="form-select"></select>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="admin-section" id="configLsSection">
+                    <h2 class="section-title">Configurar Funções e Margem (LS)</h2>
+                    <div class="card">
+                        <form id="lsForm" class="admin-form">
+                            <div class="form-row" id="lsInputsContainer" style="flex-wrap: wrap;"></div>
+                            <button type="submit" class="btn btn-primary" style="margin-top: 1rem;" id="btnSalvarLS">💾 Salvar Configurações</button>
+                        </form>
+                    </div>
+                </section>
+                
+                <section class="admin-section" id="addPrinterSectionContainer">
+                    <h2 class="section-title">Impressoras</h2>
+                    <div class="card">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h3 style="margin:0;">Listagem Geral</h3>
+                            <button class="btn btn-primary btn-small" id="btnOpenAddPrinterModal">➕ Adicionar Nova</button>
+                        </div>
+                        <div class="table-container">
+                            <table class="admin-table" id="printersTable">
+                                <thead>
+                                    <tr>
+                                        <th>Loja</th>
+                                        <th>Nome</th>
+                                        <th>Funções</th>
+                                        <th>Margens (LS)</th>
+                                        <th id="thPrinterActions">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="printersTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- ============================================ -->
+            <!-- SECTION: USUARIOS E LOJAS (Nível ≥ 2)          -->
+            <!-- ============================================ -->
+            <div id="usersSection" class="admin-view">
+                <section class="admin-section">
+                    <h2 class="section-title">Gestão de Usuários</h2>
+                    <div class="card">
+                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h3 style="margin:0;">Equipe e Permissões</h3>
+                            <button class="btn btn-primary btn-small" id="btnOpenAddUserModal">➕ Novo Usuário</button>
+                        </div>
+                        <div class="table-container">
+                            <table class="admin-table" id="usersTable">
+                                <thead>
+                                    <tr>
+                                        <th>Usuário</th>
+                                        <th>Nível</th>
+                                        <th>Lojas Permitidas</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="usersTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- NOVO: Vinculo de Funcoes com Impressoras -->
+                <section class="admin-section" style="margin-top: 2rem;">
+                    <h2 class="section-title">Vincular Impressora a Função ZPL</h2>
+                    <div class="card">
+                        <form id="bindFunctionForm" class="admin-form">
+                            <div class="form-row">
+                                <div class="form-group" style="flex: 2;">
+                                    <label class="form-label">Selecione uma Função</label>
+                                    <select id="bindFuncaoSelect" class="form-select" style="min-height: 120px;"></select>
+                                </div>
+                                <div class="form-group" style="flex: 1;">
+                                    <label class="form-label">Atribuir Impressoras (Múltipla Seleção)</label>
+                                    <div id="bindPrintersList" class="form-control" style="min-height: 120px; max-height: 200px; overflow-y: auto; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 4px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                                        <!-- Checkboxes serão injetados aqui -->
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="margin-top: 1rem;">💾 Salvar Vínculo</button>
+                        </form>
+                    </div>
+                </section>
+            </div>
+
+            <!-- ============================================ -->
+            <!-- SECTION: EDITOR ZPL (Nível 3)                  -->
+            <!-- ============================================ -->
+            <div id="templatesSection" class="admin-view">
+                <section class="admin-section">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h2 class="section-title" style="margin:0;">Templates ZPL ({Função})</h2>
+                        <button class="btn btn-primary" id="btnNewTemplate">📄 Novo Arquivo ZPL</button>
+                    </div>
+                    
+                    <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+                        <div class="card" style="flex: 1; min-width: 250px;">
+                            <h3 style="margin-top:0;">Gabaritos</h3>
+                            <ul id="templatesList" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem;">
+                                <!-- Preenchido via JS -->
+                            </ul>
+                        </div>
+                        
+                        <div class="card" style="flex: 3; min-width: 400px; display: flex; flex-direction: column;">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                                <div style="display: flex; flex-direction: column; gap: 0.3rem;">
+                                    <input type="text" id="tplFilename" class="form-input" placeholder="ex: floricultura.zpl.j2" style="max-width: 300px; font-weight: bold;">
+                                    <label style="display: flex; align-items: center; font-size: 0.85em; cursor: pointer; color: var(--text-secondary);">
+                                        <input type="checkbox" id="tplPermitirCamposExtras" style="margin-right: 0.3rem;">
+                                        Permitir Inputs Extras no Frontend (Para esse modelo)
+                                    </label>
+                                </div>
+                                <div>
+                                    <button class="btn btn-secondary btn-small" id="btnDeleteTemplate" style="background: var(--danger-color); border:none; color:white; display:none;">🗑️ Excluir</button>
+                                    <button class="btn btn-primary btn-small" id="btnSaveTemplate">💾 Salvar Alterações</button>
+                                </div>
+                            </div>
+                            <textarea id="tplContent" class="form-input" style="flex: 1; min-height: 400px; font-family: monospace; font-size: 13px; line-height: 1.5; white-space: pre; background: #fafafa; border: 1px solid #ddd;" placeholder="Selecione um template à esquerda ou crie um novo."></textarea>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <!-- ============================================ -->
+        <!-- MODALS                                         -->
+        <!-- ============================================ -->
+        <!-- Add Printer Modal -->
+        <div class="modal-overlay" id="addPrinterModal">
+            <div class="modal" style="max-width: 600px;">
+                <div class="modal-header">
+                    <h3 class="modal-title">Cadastrar Impressora</h3>
+                    <button type="button" class="modal-close" onclick="document.getElementById('addPrinterModal').classList.remove('active')">✕</button>
+                </div>
+                <div class="modal-body">
+                    <form id="addPrinterForm" class="admin-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="newLoja" class="form-label">Loja (Número)</label>
+                                <input type="number" id="newLoja" class="form-input" min="1" max="99" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="newNome" class="form-label">Nome p/ Identificação</label>
+                                <input type="text" id="newNome" class="form-input" placeholder="Ex: Frente de Caixa" required>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="newIp" class="form-label">IP da Impressora</label>
+                                <input type="text" id="newIp" class="form-input" placeholder="Ex: 10.4.30.116" required>
+                            </div>
+                            <div class="form-group" style="width: 100%;">
+                                <label for="newFuncao" class="form-label">Funções (Segure CTRL)</label>
+                                <select id="newFuncao" class="form-select" multiple></select>
+                            </div>
+                        </div>
+                        <div class="form-row" id="newLsInputsContainer" style="flex-wrap: wrap;"></div>
+                        <div style="display:flex; justify-content: flex-end; margin-top: 1rem;">
+                            <button type="submit" class="btn btn-primary">➕ Salvar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+            <!-- ============================================ -->
+            <!-- SECTION: AUDITORIA GERAL (Nível 3)             -->
+            <!-- ============================================ -->
+            <div id="auditSection" class="admin-view">
+                <section class="admin-section">
+                    <h2 class="section-title">Registro de Eventos (Audit Log)</h2>
+                    <div class="card">
+                        <div class="table-container">
+                            <table class="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 15%;">Data / Hora</th>
+                                        <th style="width: 10%;">IP Autor</th>
+                                        <th style="width: 25%;">Ação Executada</th>
+                                        <th style="width: 50%;">Detalhes (Metadados)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="auditTableBody">
+                                    <!-- Populated via Javascript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+        <!-- Add User Modal -->
+        <div class="modal-overlay" id="addUserModal">
+            <div class="modal" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h3 class="modal-title" id="userModalTitle">Cadastrar Usuário</h3>
+                    <button type="button" class="modal-close" onclick="document.getElementById('addUserModal').classList.remove('active')">✕</button>
+                </div>
+                <div class="modal-body">
+                    <form id="addUserForm" class="admin-form">
+                        <div class="form-group">
+                            <label for="newUsername" class="form-label">Login de Rede (username.sobrenome)</label>
+                            <input type="text" id="newUsername" class="form-input" placeholder="ex: deyvid.silva" required>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex: 1;">
+                                <label for="newUserLevel" class="form-label">Nível de Acesso (RBAC)</label>
+                                <select id="newUserLevel" class="form-select" required>
+                                    <option value="1">1 - Operador de Loja</option>
+                                    <option value="2">2 - Gerente (Adiciona Usuários e Imprs)</option>
+                                    <option value="3" id="optNivel3" style="display:none; color: var(--danger-color); font-weight:bold;">3 - Administrador ZPL Global</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="newUserLojas" class="form-label">Lojas Permitidas (Ex: 04, 15, 17)</label>
+                            <input type="text" id="newUserLojas" class="form-input" placeholder="Separe por vírgula">
+                            <p style="font-size: 0.75rem; color: #666; margin-top: 0.25rem;">Deixe vazio ou em branco se nível 3 tiver acesso a todas.</p>
+                        </div>
+                        <div style="display:flex; justify-content: flex-end; margin-top: 1rem;">
+                            <button type="submit" class="btn btn-primary">💾 Salvar Usuário</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="toast-container" id="toastContainer"></div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+
+</html>

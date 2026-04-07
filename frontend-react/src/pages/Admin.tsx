@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Shield, KeyRound, Printer, Users, FileCode, ScrollText, LogOut, ArrowLeft, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdminController } from '../controllers/useAdminController';

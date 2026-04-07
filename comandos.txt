@@ -34,12 +34,47 @@ Para fins de produção/lojas, geramos build do projeto de forma que as estaçõ
 A estrutura requerida (Exemplo: C:\BistekPrinter\) deve conter as subpastas isoladas:
 C:\BistekPrinter\
 ├── nginx\                  (Binários do Nginx Windows)
-├── api\                    (Executáveis Python compilados gerados pela pasta build)
-├── certs\                  (Arquivos SSL/TLS .pem corporativos)
-└── frontend-react\         (Arquivos estáticos de produção gerados pelo vite)
+├── api\                    (Executáveis Python compilados. Contém a pasta /frontend original interna)
+└── certs\                  (Autoridade Mkcert e chaves TLS vinculadas ao IP)
 
 -------------------------------------------------------------
-3. ROTINAS DE GERAÇÃO DE BUILD (DEPLOY)
+====================================================
+EPIC 15: O INSTALADOR PROFISSIONAL (INNO SETUP)
+====================================================
+
+Nós elevamos o patamar. Você não precisa mais mandar arquivos soltos para as lojas montarem o servidor na mão. Tudo virou um Instalador Windows Oficial (.exe).
+
+Passo a Passo de Geração (Na sua máquina de Dev):
+----------------------------------------------------
+1. **Compilar a Criptografia do Backend:**
+   No seu terminal do VS Code, rode o comando:
+   > python setup.py build
+   *Isso vai esconder totalmente os códigos fontes da loja. (Pode demorar vários minutos na primeira vez).*
+
+2. **Preparar a "Pasta Mãe" do Instalador:**
+   O sistema já criou uma pasta chamada `BistekPrinter-Project` na raiz do seu projeto.
+   Você deve garantir que:
+   - Os arquivos gerados na pasta `build/exe...` foram copiados para `BistekPrinter-Project/build`.
+   - O seu Nginx portátil (limpo) está dentro de `BistekPrinter-Project/nginx`.
+   - O executável do Mkcert está dentro de `BistekPrinter-Project/ferramentas`.
+
+3. **Gerar o Clicável com o Inno Setup:**
+   Abra o Software do "Inno Setup" que está instalado no seu Windows.
+   Arraste o arquivo `setup_bistek.iss` (que está na subpasta `/installer/`) para dentro dele.
+   Clique no botão **Build > Compile**.
+
+Pronto! Um arquivo chamado **Instalador_Bistek_PDV.exe** vai aparecer pronto para ser enviado para a Loja.
+
+O que o Instalador faz sozinho lá na Loja 17?
+----------------------------------------------------
+1. Ele criará a pasta `C:\BistekPrinter`.
+2. Durante o Next > Next, ele terá uma tela pedindo o 'IP da Máquina' e o 'Token AD'.
+3. Ele injetará o Token no nosso Cofre Blindado Automático sem exigir o CMD.
+4. Ele emitirá o certificado TLS do IP digitado em background via Mkcert.
+5. Criará os ícones de área de trabalho com o Frontend Clássico na Veia!
+
+-------------------------------------------------------------
+4. ROTINAS DE GERAÇÃO DE BUILD (DEPLOY)
 -------------------------------------------------------------
 A) Geração do Payload Python (Backend):
    Execute na raiz do terminal para higienizar cache e gerar o executável stand-alone:
@@ -47,10 +82,7 @@ A) Geração do Payload Python (Backend):
    >> python setup.py build
    O conteúdo da pasta `build/exe.win-amd64...` corresponde à pasta `api` na infraestrutura da loja.
 
-B) Geração do Payload React (Frontend):
-   Abra o diretório `frontend-react` e execute:
-   >> npm run build
-   Uma pasta oculta chamada `dist/` será gerada. Transfira integralmente o conteúdo da pasta `dist/` para dentro do servidor de produção da Loja (pasta `frontend-react`).
+
 
 -------------------------------------------------------------
 4. CONFIGURAÇÃO DE SEGURANÇA E PROXY SERVER (NGINX) - Link para gerar Certificado https://github.com/filosottile/mkcert/releases
@@ -98,3 +130,4 @@ DEPENDÊNCIAS MATRIZ PROJETO ORIGINAL (PYTHON TIER)
 pip install flask waitress pywin32 Pillow cx_Freeze requests aiohttp cryptography==45.0.6 pydantic "flask[async]" python-dotenv oauthlib==3.3.1
 =============================================================
 taskkill /f /im BistekPrinter.exe /t
+jrsoftware.org/isdl.php - > baixar innosetup-xxx.exe

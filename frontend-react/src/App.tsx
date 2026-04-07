@@ -8,7 +8,7 @@ import Admin from './pages/Admin';
 import Login from './pages/Login';
 
 // Proteger rotas baseadas no Level do AuthContext
-const ProtectedRoute = ({ children, minLevel = 1 }: { children: JSX.Element, minLevel?: number }) => {
+const ProtectedRoute = ({ children, minLevel = 1 }: { children: React.ReactNode, minLevel?: number }) => {
   const { authState } = useAuth();
   if (!authState.isAuthenticated) return <Navigate to="/login" replace />;
   if (authState.level < minLevel) return <Navigate to="/" replace />; // Ex: Operador (1) tentando ver Admin (3)
@@ -16,7 +16,7 @@ const ProtectedRoute = ({ children, minLevel = 1 }: { children: JSX.Element, min
 };
 
 // Se já logado, não precisa ver o Login de novo
-const PublicOnlyRoute = ({ children }: { children: JSX.Element }) => {
+const PublicOnlyRoute = ({ children }: { children: React.ReactNode }) => {
   const { authState } = useAuth();
   if (authState.isAuthenticated) return <Navigate to="/" replace />;
   return children;

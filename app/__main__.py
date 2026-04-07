@@ -43,6 +43,12 @@ if "--setup" in sys.argv:
         print("✅ Cofre de chaves trancado.")
 
     url_bapi = "https://api.bistek.com.br"
+    if "--url" in sys.argv:
+        try:
+            url_bapi = sys.argv[sys.argv.index("--url") + 1]
+        except (ValueError, IndexError):
+            pass
+    
     security.update_env_file("BSTK_BAPI", url_bapi)
     
     # --- AJUSTE AQUI: Tenta pegar o token do comando primeiro ---

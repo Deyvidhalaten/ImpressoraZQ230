@@ -1,6 +1,6 @@
 import axios from 'axios';
 import type { ContextResponseDTO } from '../dtos/ContextDTO';
-import { toast } from 'react-toastify';
+
 
 export const apiClient = axios.create({
     baseURL: '/api',
