@@ -53,6 +53,9 @@ build_exe_options = {
     ],
     "include_files": includefiles,
     "include_msvcr": True,
+    "zip_include_packages": "*",
+    "zip_exclude_packages": [],
+    "optimize": 2,
     "excludes": [
         "tkinter",
         "unittest",
@@ -72,7 +75,7 @@ base = "Win32GUI" if sys.platform == "win32" else None
 # -------------------------------------------------------------------
 setup(
     name="BistekPrinter",
-    version="2.0.0",
+    version="2.3.2",
     description="Sistema de Impressão ZQ230 - Projeto Bistek",
     options={"build_exe": build_exe_options},
     executables=[

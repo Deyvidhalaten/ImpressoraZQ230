@@ -4,13 +4,15 @@ from flask import Blueprint, request, jsonify, current_app
 from app.repositories.printer_repository import load_printer_map_from
 from app.services.filial_service import FilialService
 from app.services.printing_service import _is_test_mode
-from app.services.security_service import SecurityService
 from app.services.templates_service import list_templates_by_mode
 from app.services.product_service import ProductService
 from app.dtos.context_response_dto import ContextResponseDTO, PrinterResponseDTO, ModosResponseDTO
 from app.mappers.product_mapper import ProductMapper
 
 bp = Blueprint("context_controller", __name__, url_prefix="/api")
+def obter_ip_cliente():
+    #Tenta pegar o IP que o Nginx repassou. Se não existir, pega o direto.
+    return request.headers.get('X-Real-IP', request.remote_addr)
 
 @bp.route("/context", methods=["GET", "OPTIONS"])
 def context():
@@ -24,7 +26,8 @@ def context():
     templates_dir = DIRS["templates"]
 
     mappings = load_printer_map_from(data_dir)
-    client_ip = request.remote_addr
+    #client_ip = request.remote_addr
+    client_ip = obter_ip_cliente()
     is_test_config = _is_test_mode()
     
     # Detecta modo teste: settings.txt OU acesso via localhost
@@ -113,7 +116,8 @@ async def search_products():
     products = []
     try:
         from app.services.printing_service import _is_test_mode
-        client_ip = request.remote_addr
+        #client_ip = request.remote_addr
+        client_ip = obter_ip_cliente()
         is_test = _is_test_mode() or client_ip in ("127.0.0.1", "::1", "localhost")
         
         cod_empresa = None

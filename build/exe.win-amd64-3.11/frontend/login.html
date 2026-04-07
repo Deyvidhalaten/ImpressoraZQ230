@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Admin - BistekPrinter</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .login-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: var(--bg-primary);
+        }
+
+        .login-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .login-title {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: var(--text-primary);
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .error-message {
+            color: #d32f2f;
+            background-color: #ffebee;
+            padding: 0.75rem;
+            border-radius: var(--radius);
+            margin-bottom: 1rem;
+            text-align: center;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .logo-login {
+            display: block;
+            margin: 0 auto 1.5rem;
+            height: 40px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <img src="logo-bistek.png" alt="Bistek" class="logo-login" onerror="this.style.display='none'">
+            <h2 class="login-title">Acesso Restrito</h2>
+
+            <div id="errorMessage" class="error-message"></div>
+
+            <form id="loginForm">
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label for="username" class="form-label">Usuário</label>
+                    <input type="text" id="username" class="form-input" required autofocus>
+                </div>
+                <div class="form-group" style="margin-bottom: 1.5rem;">
+                    <label for="password" class="form-label">Senha</label>
+                    <input type="password" id="password" class="form-input" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Entrar</button>
+                <div style="text-align: center; margin-top: 1rem;">
+                    <a href="index.html" class="nav-link" style="font-size: 0.9rem; text-decoration: underline;">Voltar
+                        para Impressão Livre</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Container (se necessário, ou erro inline mesmo) -->
+
+    <script src="auth.js"></script>
+</body>
+
+</html>

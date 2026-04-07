@@ -1,5 +1,7 @@
 import socket
 from pathlib import Path
+
+from flask import request
 from app.constants import DEFAULT_PORTA as PORTA_IMPRESSORA
 from app.bootstrap import get_appdata_root
 
@@ -39,4 +41,3 @@ def enviar_para_impressora_ip(zpl: str, ip: str, porta: int = PORTA_IMPRESSORA, 
     except Exception as e:
         print("Erro ao enviar ZPL por IP:", e)
         return False
-

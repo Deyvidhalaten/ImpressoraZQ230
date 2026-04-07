@@ -1,82 +1,113 @@
+; ---------------------------------------------------------
+; SCRIPT DE INSTALAÇÃO - BISTEK PRINTER SYSTEM v3.3.1
+; Desenvolvido por: Deyvid Silva (TI Bistek)
+; ---------------------------------------------------------
+
 [Setup]
 AppName=Bistek Printer System
-AppVersion=2.0
+AppVersion=3.3.1
 DefaultDirName=C:\BistekPrinter
 DefaultGroupName=BistekPrinter
 DisableProgramGroupPage=yes
-; O instalador vai rodar como administrador para poder mexer no C: e Nginx
 PrivilegesRequired=admin
 OutputBaseFilename=Instalador_Bistek_PDV
 OutputDir=..\
+Compression=lzma
+SolidCompression=yes
 
 [Files]
-; Captura o Nginx base de produção (que fará o SSL Pass para o Python)
+; 1. Nginx
 Source: "..\nginx\*"; DestDir: "{app}\nginx"; Flags: ignoreversion recursesubdirs createallsubdirs
-; Captura as Ferramentas Extras
-Source: "..\ferramentas\*"; DestDir: "{app}\certs"; Flags: ignoreversion recursesubdirs createallsubdirs
-; Captura toda a compilação do Backend Python (Junto ao Front Clássico, ofuscado pelo cx_Freeze)
+; 2. Ferramentas (mkcert)
+Source: "..\ferramentas\mkcert.exe"; DestDir: "{app}\tools"; Flags: ignoreversion
+; 3. Backend Python (O executável principal)
 Source: "..\build\*"; DestDir: "{app}\api"; Flags: ignoreversion recursesubdirs createallsubdirs
+; 4. FRONTEND (Ajuste: Adicionando a pasta que estava faltando no instalador)
+Source: "..\frontend\*"; DestDir: "{app}\api\frontend"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[Dirs]
+Name: "{app}\nginx\temp"
+Name: "{app}\nginx\temp\client_body_temp"
+Name: "{app}\nginx\temp\proxy_temp"
+Name: "{app}\nginx\temp\fastcgi_temp"
+Name: "{app}\nginx\logs"
 
 [Icons]
-Name: "{group}\Bistek Printer (Parar-Iniciar)"; Filename: "{app}\nginx\Restart_Bistek.bat"
-Name: "{commondesktop}\Bistek Printer (Operação)"; Filename: "https://localhost"; IconFilename: "{app}\api\logo.ico"
-; Injeção Sólida no Auto-Run do Windows (Inicializar com o Sistema) com os Diretórios de Trabalho perfeitos!
-Name: "{autostartup}\Bistek_Nginx_Engine"; Filename: "{app}\nginx\nginx.exe"; WorkingDir: "{app}\nginx";
-Name: "{autostartup}\Bistek_Python_API"; Filename: "{app}\api\BistekPrinter.exe"; WorkingDir: "{app}\api";
+Name: "{group}\Reiniciar Servidor Bistek"; Filename: "{app}\nginx\Restart_Bistek.bat"
+Name: "{commondesktop}\Bistek Printer (Operação)"; Filename: "https://{code:GetAppIP}/frontend/"; IconFilename: "{app}\api\logo.ico"
+
+Name: "{autostartup}\Bistek_Nginx"; Filename: "{app}\nginx\nginx.exe"; Parameters: "-p ""{app}\nginx"""; WorkingDir: "{app}\nginx"; Flags: runminimized
+Name: "{autostartup}\Bistek_API"; Filename: "{app}\api\BistekPrinter.exe"; WorkingDir: "{app}\api"; Flags: runminimized
+
+[Registry]
+Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "BistekNginx"; ValueData: """{app}\nginx\nginx.exe"" -p ""{app}\nginx"""; Flags: uninsdeletevalue
+Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "BistekAPI"; ValueData: """{app}\api\BistekPrinter.exe"""; Flags: uninsdeletevalue
+
+[Run]
+Filename: "{app}\nginx\nginx.exe"; Parameters: "-p ""{app}\nginx"""; WorkingDir: "{app}\nginx"; Flags: nowait runhidden
+Filename: "{app}\api\BistekPrinter.exe"; WorkingDir: "{app}\api"; Flags: nowait
 
 [Code]
 var
   ConfigPage: TInputQueryWizardPage;
 
+function GetAppIP(Param: String): String;
+begin
+  Result := Trim(ConfigPage.Values[0]);
+  if Result = '' then Result := '127.0.0.1';
+end;
+
 procedure InitializeWizard;
 begin
-  // Cria a página de configuração dinâmica
   ConfigPage := CreateInputQueryPage(wpSelectDir,
-    'Configuração Segura de PDV', 'Autenticação e Rede (Loja)',
-    'Por favor, insira o IP que a balança e os celulares usarão para acessar a API, e o Token Master da BAPI:');
+    'Configuração Segura de PDV', 'Rede e Autenticação',
+    'Informe o IP desta máquina para o certificado SSL e os dados da BAPI (Se vazio, usará 127.0.0.1):');
   
-  ConfigPage.Add('IP Local desta Máquina (Ex: 192.168.0.188):', False);
-  ConfigPage.Add('Token da BAPI (Secret):', False);
-  ConfigPage.Add('URL base da BAPI:', False);
+  ConfigPage.Add('IP Local desta Máquina (Ex: 10.17.30.2):', False);
+  ConfigPage.Add('Token Master da BAPI:', False);
+  ConfigPage.Add('URL Base da BAPI:', False);
   
-  ConfigPage.Values[0] := '127.0.0.1'; 
-  ConfigPage.Values[1] := ''; 
+  ConfigPage.Values[0] := '10.17.30.2'; 
   ConfigPage.Values[2] := 'https://api.bistek.com.br';
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  NginxRawData: AnsiString;
-  NginxConfigString: String;
+  NginxConfigAnsi: AnsiString;
+  NginxConfigUnicode: String;
   AppIP, AppToken, AppURL: String;
   ResultCode: Integer;
 begin
   if CurStep = ssPostInstall then
   begin
-    AppIP := ConfigPage.Values[0];
+    AppIP := Trim(ConfigPage.Values[0]);
     AppToken := ConfigPage.Values[1];
     AppURL := ConfigPage.Values[2];
 
-    // 1. GERAR CERTIFICADOS TLS OBRIGATÓRIOS PARA ZEBRA NA HORA
-    // Executa e aguarda o mkcert instalar a Raiz de Confiança Local
-    Exec(ExpandConstant('{app}\certs\mkcert.exe'), '-install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    // Emite o certificado assinado atrelado ao IP Local digitado!
-    Exec(ExpandConstant('{app}\certs\mkcert.exe'), '-cert-file certificate.crt -key-file private.key ' + AppIP + ' localhost 127.0.0.1', ExpandConstant('{app}\nginx\conf'), SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    if AppIP = '' then AppIP := '127.0.0.1';
 
-    // 2. MODIFICAR NGINX ON THE FLY (Substituição de String Inteligente no conf)
-    if LoadStringFromFile(ExpandConstant('{app}\nginx\conf\nginx.conf'), NginxRawData) then
+    // --- PASSO 1: GERAR CERTIFICADO ---
+    Exec(ExpandConstant('{app}\tools\mkcert.exe'), '-install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    
+    // Caminho direto na CONF para não precisar de prefixo /certs
+    Exec(ExpandConstant('{app}\tools\mkcert.exe'), 
+         '-cert-file certificate.crt -key-file private.key ' + AppIP + ' localhost 127.0.0.1', 
+         ExpandConstant('{app}\nginx\conf'), 
+         SW_HIDE, ewWaitUntilTerminated, ResultCode);
+
+    // --- PASSO 2: PATCH NO NGINX.CONF ---
+    if LoadStringFromFile(ExpandConstant('{app}\nginx\conf\nginx.conf'), NginxConfigAnsi) then
     begin
-      NginxConfigString := String(NginxRawData);
-      StringChangeEx(NginxConfigString, 'REPLACE_ME_IP', AppIP, True);
-      NginxRawData := AnsiString(NginxConfigString);
-      SaveStringToFile(ExpandConstant('{app}\nginx\conf\nginx.conf'), NginxRawData, False);
+      NginxConfigUnicode := String(NginxConfigAnsi);
+      // O StringChangeEx com o último parâmetro True substitui TODAS as ocorrências do IP
+      StringChangeEx(NginxConfigUnicode, 'REPLACE_ME_IP', AppIP, True);
+      SaveStringToFile(ExpandConstant('{app}\nginx\conf\nginx.conf'), AnsiString(NginxConfigUnicode), False);
     end;
 
-    // 3. ABASTECER O COFRE PYTHON (Chamada de Linha de Comando Oculta!)
-    // Invoca o cx_freeze exe rodando o parser argparse via --setup invés de pedir input iterativo!
-    Exec(ExpandConstant('{app}\api\BistekPrinter.exe'), '--setup --url "' + AppURL + '" --token "' + AppToken + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-
-    // 4. INSTALANDO SERVIÇO EM SEGUNDO PLANO
-    // Neste estágio você pode opcionalmente ativar o NSSM ou AutoRun do Windows Registry.
+    // --- PASSO 3: CONFIGURAR BACKEND ---
+    Exec(ExpandConstant('{app}\api\BistekPrinter.exe'), 
+         '--setup --url "' + AppURL + '" --token "' + AppToken + '"', 
+         ExpandConstant('{app}\api'), 
+         SW_HIDE, ewWaitUntilTerminated, ResultCode);
   end;
 end;
