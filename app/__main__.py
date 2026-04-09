@@ -36,11 +36,11 @@ security = SecurityService()
 # --- MODO SETUP: CONFIGURAÇÃO INICIAL (python -m app --setup) ---
 if "--setup" in sys.argv:
     print("\n" + "="*60)
-    print("🔒 BISTEK PRINTER - CONFIGURAÇÃO DE AMBIENTE SEGURO")
+    print(" BISTEK PRINTER - CONFIGURAÇÃO DE AMBIENTE SEGURO")
     print("="*60)
     
     if security.lock_vault_folder():
-        print("✅ Cofre de chaves trancado.")
+        print(" Cofre de chaves trancado.")
 
     url_bapi = "https://api.bistek.com.br"
     if "--url" in sys.argv:
@@ -66,13 +66,13 @@ if "--setup" in sys.argv:
         try:
             token_puro = input("\nDigite o TOKEN AD de Produção: ").strip()
         except EOFError:
-            print("\n❌ Erro: Não foi possível ler o input. Use o parâmetro --token.")
+            print("\n Erro: Não foi possível ler o input. Use o parâmetro --token.")
             sys.exit(1)
     
     if token_puro:
         token_crip = security.encrypt_data(token_puro)
         security.update_env_file("TOKEN_AD", token_crip)
-        print("\n✅ Token configurado com sucesso!")
+        print("\n Token configurado com sucesso!")
     
     sys.exit(0)
 
@@ -148,15 +148,15 @@ app.config['PRODUCT_SERVICE'] = ProductService(client_api=bapi_url, token=token_
 app.config['FILIAL_SERVICE_INSTANCIA'] = servico_filiais
 
 # Sincronização inicial de filiais
-print("🔄 Sincronizando rede de filiais...")
+print(" Sincronizando rede de filiais...")
 try:
     sucesso_sync = asyncio.run(servico_filiais.sincronizar_rede())
     if sucesso_sync:
-        print("✅ Filiais carregadas.")
+        print(" Filiais carregadas.")
     else:
-        print("⚠️  Aviso: Operando com base de filiais local/offline.")
+        print(" Aviso: Operando com base de filiais local/offline.")
 except Exception as e:
-    print(f"❌ Falha crítica na sincronização: {e}")
+    print(f" Falha crítica na sincronização: {e}")
 
 # Fonte e Impressoras
 windows_font = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts", "arial.ttf")
@@ -209,7 +209,7 @@ if __name__ == "__main__" or __name__ == "app.__main__":
     if not os.environ.get("IMPORT_ONLY"):
         is_dev = os.environ.get("FLASK_ENV") == "development" or hasattr(sys, 'gettrace') and sys.gettrace() is not None
         
-        print(f"🚀 BistekPrinter rodando em {'MODO DEBUG' if is_dev else 'MODO PRODUÇÃO'}")
+        print(f" BistekPrinter rodando em {'MODO DEBUG' if is_dev else 'MODO PRODUÇÃO'}")
         app.run(
             host="0.0.0.0", 
             port=8000, 

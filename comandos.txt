@@ -129,5 +129,13 @@ O Token persistirá de forma nativa e UAC Compliant no diretório `%LOCALAPPDATA
 DEPENDÊNCIAS MATRIZ PROJETO ORIGINAL (PYTHON TIER)
 pip install flask waitress pywin32 Pillow cx_Freeze requests aiohttp cryptography==45.0.6 pydantic "flask[async]" python-dotenv oauthlib==3.3.1
 =============================================================
+
+Comandos Lembrete
 taskkill /f /im BistekPrinter.exe /t
 jrsoftware.org/isdl.php - > baixar innosetup-xxx.exe
+
+Para gerar a Build executar os 4 comadnso em sequencia
+Remove-Item -Recurse -Force build
+Remove-Item -Recurse -Force BistekPrinter-Project\build\*
+python setup.py build
+xcopy /E /I /Y build\exe.win-amd64-3.13\* BistekPrinter-Project\build
