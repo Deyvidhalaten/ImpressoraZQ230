@@ -28,9 +28,13 @@ export default function Login() {
       });
 
       if (resp.data.success && resp.data.token) {
-        setToken(resp.data.token);
-        toast.success(`Login concluído! Bem vindo, ${resp.data.nome}`);
-        navigate('/');
+        toast.success(`Login concluído! BAPI Conectada.`);
+        // Removemos o navigate('/') forçado. 
+        // Quando o setToken rodar, o App.tsx vai detectar o token e o PublicOnlyRoute
+        // vai fazer o redirecionamento Declarativo para '/' automaticamente sem estourar o Router.
+        setTimeout(() => {
+            setToken(resp.data.token);
+        }, 800);
       } else {
         toast.error(resp.data.error || 'Autenticação Inválida');
       }

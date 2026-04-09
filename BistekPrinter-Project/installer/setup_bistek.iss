@@ -10,7 +10,7 @@ DefaultDirName=C:\BistekPrinter
 DefaultGroupName=BistekPrinter
 DisableProgramGroupPage=yes
 PrivilegesRequired=admin
-OutputBaseFilename=Instalador_Bistek_PDV
+OutputBaseFilename=Instalador_BistekPrinter
 OutputDir=..\
 Compression=lzma
 SolidCompression=yes
@@ -26,11 +26,13 @@ Source: "..\build\*"; DestDir: "{app}\api"; Flags: ignoreversion recursesubdirs 
 Source: "..\frontend\*"; DestDir: "{app}\api\frontend"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Dirs]
-Name: "{app}\nginx\temp"
-Name: "{app}\nginx\temp\client_body_temp"
-Name: "{app}\nginx\temp\proxy_temp"
-Name: "{app}\nginx\temp\fastcgi_temp"
-Name: "{app}\nginx\logs"
+Name: "{app}"; Permissions: users-full
+Name: "{app}\appdata"; Permissions: users-full
+Name: "{app}\nginx\temp"; Permissions: users-full
+Name: "{app}\nginx\temp\client_body_temp"; Permissions: users-full
+Name: "{app}\nginx\temp\proxy_temp"; Permissions: users-full
+Name: "{app}\nginx\temp\fastcgi_temp"; Permissions: users-full
+Name: "{app}\nginx\logs"; Permissions: users-full
 
 [Icons]
 Name: "{group}\Reiniciar Servidor Bistek"; Filename: "{app}\nginx\Restart_Bistek.bat"
@@ -60,7 +62,7 @@ end;
 procedure InitializeWizard;
 begin
   ConfigPage := CreateInputQueryPage(wpSelectDir,
-    'Configuração Segura de PDV', 'Rede e Autenticação',
+    'Configuração Segura do Sistema', 'Rede e Autenticação',
     'Informe o IP desta máquina para o certificado SSL e os dados da BAPI (Se vazio, usará 127.0.0.1):');
   
   ConfigPage.Add('IP Local desta Máquina (Ex: 10.17.30.2):', False);

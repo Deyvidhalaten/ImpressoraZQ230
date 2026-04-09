@@ -5,10 +5,11 @@ from cryptography.fernet import Fernet
 
 class SecurityService:
     def __init__(self):
-        # Movido do C:\ProgramData para LOCALAPPDATA para rodar 100% sem Admin (UAC Block)
-        self.vault_dir = Path(os.environ.get('LOCALAPPDATA', 'C:/')) / "BistekPrinter" / "Vault"
+        # Desvinculado de conta de usuário: Salva as keys na raiz global da instalação
+        # e evita sumiço do token quando o Instalador Admin vira um Usuário Padrão logado.
+        self.vault_dir = Path("C:/BistekPrinter/appdata") / "Vault"
         self.key_path = self.vault_dir / "secret.key"
-        self.env_path = Path(os.environ.get('LOCALAPPDATA', 'C:/')) / "BistekPrinter" / ".env"
+        self.env_path = Path("C:/BistekPrinter/appdata") / ".env"
         self.vault_dir.mkdir(parents=True, exist_ok=True)
         self.env_path.parent.mkdir(parents=True, exist_ok=True)
 
