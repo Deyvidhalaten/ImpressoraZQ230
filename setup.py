@@ -55,7 +55,7 @@ base = "Win32GUI" if sys.platform == "win32" else None
 
 setup(
     name="BistekPrinter",
-    version="2.3.2",
+    version="2.3.3",
     description="Sistema de Impressão ZQ230 - Modo Produção",
     options={"build_exe": build_exe_options},
     executables=[

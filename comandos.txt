@@ -52,7 +52,7 @@ Passo a Passo de Geração (Na sua máquina de Dev):
    *Isso vai esconder totalmente os códigos fontes da loja. (Pode demorar vários minutos na primeira vez).*
 
 2. **Preparar a "Pasta Mãe" do Instalador:**
-   O sistema já criou uma pasta chamada `BistekPrinter-Project` na raiz do seu projeto.
+   O sistema já criou uma pasta chamada `BistekPrinter-Project` na raiz do projeto.
    Você deve garantir que:
    - Os arquivos gerados na pasta `build/exe...` foram copiados para `BistekPrinter-Project/build`.
    - O seu Nginx portátil (limpo) está dentro de `BistekPrinter-Project/nginx`.
@@ -65,13 +65,13 @@ Passo a Passo de Geração (Na sua máquina de Dev):
 
 Pronto! Um arquivo chamado **Instalador_Bistek_PDV.exe** vai aparecer pronto para ser enviado para a Loja.
 
-O que o Instalador faz sozinho lá na Loja 17?
+O que o Instalador faz sozinho ?
 ----------------------------------------------------
 1. Ele criará a pasta `C:\BistekPrinter`.
 2. Durante o Next > Next, ele terá uma tela pedindo o 'IP da Máquina' e o 'Token AD'.
 3. Ele injetará o Token no nosso Cofre Blindado Automático sem exigir o CMD.
 4. Ele emitirá o certificado TLS do IP digitado em background via Mkcert.
-5. Criará os ícones de área de trabalho com o Frontend Clássico na Veia!
+5. Criará os ícones de área de trabalho - Pendencia pra resolver ainda
 
 -------------------------------------------------------------
 4. ROTINAS DE GERAÇÃO DE BUILD (DEPLOY)
@@ -98,7 +98,7 @@ Para tráfego seguro HTTP/HTTPS em produção, edite arquivo `C:\BistekPrinter\n
        proxy_pass http://127.0.0.1:8000;
    }
 
-   # Resolução do Site Estático Vite-React
+   # Resolução do Site Estático Vite-React - Fase de Testes ainda, não utilizar para produção (TESTE-REACT - Instalador_BistekPrinter)
    location / {
        root C:/BistekPrinter/frontend-react;
        index index.html;
@@ -129,6 +129,21 @@ O Token persistirá de forma nativa e UAC Compliant no diretório `%LOCALAPPDATA
 DEPENDÊNCIAS MATRIZ PROJETO ORIGINAL (PYTHON TIER)
 pip install flask waitress pywin32 Pillow cx_Freeze requests aiohttp cryptography==45.0.6 pydantic "flask[async]" python-dotenv oauthlib==3.3.1
 =============================================================
+# Dependências Antigas, Validar ainda oque é realmente Usadoo
+=============================================================
+pip install flask                     # Web framework (inclui werkzeug e itsdangerous)
+pip install waitress                  # Servidor WSGI para produção
+pip install pywin32                   # Comunicação nativa com a impressora no Windows
+pip install Pillow                    # Manipulação de imagens (PIL) para geração de ZPL
+pip install cx_Freeze                 # Empacota o app em executável Windows (.exe)
+pip install requests                  # Usado para testes unitários no projeto
+pip install aiohttp                   # 
+pip install cryptography==45.0.6
+pip install pydantic
+pip install "flask[async]"
+pip install python-dotenv
+pip install oauthlib==3.3.1
+=============================================================
 
 Comandos Lembrete
 taskkill /f /im BistekPrinter.exe /t
@@ -139,3 +154,5 @@ Remove-Item -Recurse -Force build
 Remove-Item -Recurse -Force BistekPrinter-Project\build\*
 python setup.py build
 xcopy /E /I /Y build\exe.win-amd64-3.13\* BistekPrinter-Project\build
+Rotina esperada: Ele elimina antiga Build, tantno no projeto principal quanto no local e entao faz a build novamente e 
+remaneja a build gerada para dentro do Projeto (Gerador de Instalador)

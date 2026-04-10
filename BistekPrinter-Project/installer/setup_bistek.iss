@@ -5,7 +5,7 @@
 
 [Setup]
 AppName=Bistek Printer System
-AppVersion=3.3.1
+AppVersion=3.3.3
 DefaultDirName=C:\BistekPrinter
 DefaultGroupName=BistekPrinter
 DisableProgramGroupPage=yes

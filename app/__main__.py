@@ -172,7 +172,7 @@ app.register_blueprint(print_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(stats_bp)
 
-# --- SERVIDOR DE FRONTEND ---
+#FRONTEND
 if getattr(sys, "frozen", False):
     FRONTEND_DIR = os.path.join(os.path.dirname(sys.executable), "frontend")
 else:
