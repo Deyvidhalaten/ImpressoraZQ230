@@ -167,6 +167,7 @@ def print_label():
         "infnutri": nutri_list,
         "nutri": nutri_obj,
         "dataValidade": dataValidade,
+        "a":dto.produto_dados.get
     }
     
     # Merge de todas as variáveis cruas na raiz do JINJA para flexibilidade nos ZPLs
