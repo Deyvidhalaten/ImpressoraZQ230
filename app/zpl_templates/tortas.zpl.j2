@@ -5,4 +5,10 @@
 ^FO220,150^A0N,50,30^FD{{data}}^FS
 ^FO220,230^A0N,50,30^FDValidade:^FS
 ^FO220,280^A0N,50,30^FD{{validade}} Dias^FS
+
+^FO90,50^A0N,50,20^FD{{ produto.DESCRICAO }}^FS
+^FO130,440^A0N,25,20^FDEm Estoque: {{ produto.ESTOQUE }} Kg^FS
+^FO90,550^A0N,40,30^FDObs do Fornecedor: {{ produto.REFERENCIA_FORN }}^FS
+^FO90,265^A0N,15,20^FDAcucares totais: {{ nutri.acucar_tot|d1 }}g^FS
+^FO90,285^A0N,15,20^FDAcucares adic.: {{ nutri.acucar_add|d1 }}g - {{ nutri.vd_acucar_add|vd('acucar') }}%VD^FS
 ^XZ

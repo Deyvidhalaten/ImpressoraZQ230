@@ -126,7 +126,12 @@ def print_label():
         "trans": rec.get("VL_GORD_TRANS_100", rec.get("GOR_TRANS", "")),
         "fibra": rec.get("VL_FIBRA_100", rec.get("FIBRA", "")),
         "sodio_mg": rec.get("VL_SODIO_100", rec.get("SODIO", "")),
-    } if "VL_CAL_100" in rec or "VL_CALORICO" in rec else (rec.get("nutri") or {})
+        # --- Novas Regras ANVISA ---
+        "acucar_tot": rec.get("VL_ACUCAR_TOT_100", rec.get("ACUCAR_TOT", "")),
+        "acucar_add": rec.get("VL_ACUCAR_ADD_100", rec.get("ACUCAR_ADD", "")),
+        "vd_acucar_add": rec.get("VD_ACUCAR_ADD", ""),
+        "alto_sodio": rec.get("ALTOEMSODIO", ""),
+    } if "VL_CAL_100" in rec or "VL_CALORICO" in rec or "PORCAO" in rec else (rec.get("nutri") or {})
     
     nutri_list = [nutri_obj] if nutri_obj else []
 
@@ -167,7 +172,7 @@ def print_label():
         "infnutri": nutri_list,
         "nutri": nutri_obj,
         "dataValidade": dataValidade,
-        "a":dto.produto_dados.get
+        "produto": rec  # Objeto bruto completo injetado direto no Jinja2!
     }
     
     # Merge de todas as variáveis cruas na raiz do JINJA para flexibilidade nos ZPLs
