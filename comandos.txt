@@ -156,3 +156,26 @@ python setup.py build
 xcopy /E /I /Y build\exe.win-amd64-3.13\* BistekPrinter-Project\build
 Rotina esperada: Ele elimina antiga Build, tantno no projeto principal quanto no local e entao faz a build novamente e 
 remaneja a build gerada para dentro do Projeto (Gerador de Instalador)
+
+============================================
+Comandos Git (GitLab) pra nao esquecer Comandos
+Uma das formas:
+notepad ~/.ssh/config
+
+Host git.bistek.com.br
+    HostName git.bistek.com.br
+    User git
+    Port 2424
+    IdentityFile ~/.ssh/id_ed25519
+
+cat <<EOF > ~/.ssh/config
+Host git.bistek.com.br
+    HostName git.bistek.com.br
+    User git
+    Port 2424
+    IdentityFile ~/.ssh/id_ed25519
+EOF
+
+cat ~/.ssh/config
+
+git clone git@git.bistek.com.br:equipeti/etiquetas.git

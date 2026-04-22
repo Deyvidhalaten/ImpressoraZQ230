@@ -145,16 +145,15 @@ def print_label():
         if len(ean_raw) < 12:
             ean_final = ean_raw.zfill(12)
 
-    val_dias = rec.get("validade") or 0
+    val_dias = rec.get("validade") or 5 # Padrão de 5 dias para descongelados
     data_hoje = date.today()
     
     try:
         val_dias_int = int(val_dias)
         dataobj = data_hoje + timedelta(days=val_dias_int)
-        dataValidade = dataobj.strftime("%d/%m/%Y")
+        dataValidadeDescongelamento = dataobj.strftime("%d/%m/%Y")
     except:
-        # Tenta pegar DT_VALIDADE (que já é string em formato brasileiro da BAPI)
-        dataValidade = rec.get("DT_VALIDADE", "")
+        dataValidadeDescongelamento = rec.get("DT_VALIDADE", "")
         
     codprod = str(rec.get('codprod') or rec.get('CODPROD') or rec.get('SEQPRODUTO') or '')
     descricao = str(rec.get('descricao') or rec.get('DESCRICAO') or '')
@@ -168,14 +167,12 @@ def print_label():
         "copies": dto.copies,
         "ls": loja_map.get("ls", {}).get(dto.modo, 0),
         "data": datetime.now().strftime("%d/%m/%Y"),
-        "validade": val_dias,
         "infnutri": nutri_list,
         "nutri": nutri_obj,
-        "dataValidade": dataValidade,
-        "produto": rec  # Objeto bruto completo injetado direto no Jinja2!
+        "dataValidadeDescongelamento": dataValidadeDescongelamento,
+        "produto": rec
     }
     
-    # Merge de todas as variáveis cruas na raiz do JINJA para flexibilidade nos ZPLs
     for k, v in rec.items():
         if k not in ctx:
             ctx[k] = v
