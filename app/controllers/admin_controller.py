@@ -340,8 +340,9 @@ def save_template():
         permitir = bool(data.get("permitir_campos_extras", False))
         from app.services.templates_service import save_template_meta
         save_template_meta(templates_dir, filename, permitir)
-    except Exception:
-        pass
+    except Exception as e:
+        from app.services.log_service import log_error
+        log_error("Erro de Gravação Metadados ZPL", str(e))
         
     log_audit("template_saved", ip=request.remote_addr, detalhes=f"filename={filename}")
     
