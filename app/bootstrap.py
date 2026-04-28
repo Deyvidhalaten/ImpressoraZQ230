@@ -2,10 +2,18 @@ import os, shutil
 from pathlib import Path
 
 def get_appdata_root() -> Path:
-    # Retiramos a dependência da variável LOCALAPPDATA do usuário Logado.
-    # Usando a raiz da instalação, os dados (Templates, Token) ficam disponíveis para qualquer usuário.
-    base = Path("C:/BistekPrinter")
-    return base / "appdata"
+    import platform
+    # 1. Permite injetar via Docker (Ex: ENV BISTEK_DATA_DIR=/app/data)
+    env_dir = os.environ.get("BISTEK_DATA_DIR")
+    if env_dir:
+        return Path(env_dir)
+        
+    # 2. Se for Windows (Ambiente de Produção Antigo/Atual)
+    if platform.system() == "Windows":
+        return Path("C:/BistekPrinter/appdata")
+        
+    # 3. Se for Docker/Linux nativo (Fallback)
+    return Path("/app/appdata")
 
 def _copy_if_missing(src: Path, dst: Path):
     if src.is_file() and not dst.exists():
