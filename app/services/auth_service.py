@@ -30,10 +30,22 @@ def init_users_file(data_dir: Path):
                 "nivel": 3,
                 "lojas": ["*"]
             },
-            "fabiano.bertoti": {
+            "fabiano.bertotti": {
                 "nivel": 3,
                 "lojas": ["*"]
-            }
+            },
+                "joao.nascimento": {
+                "nivel": 3,
+                "lojas": ["*"]
+            },
+            	"edvaldo.sena": {
+                "nivel": 3,
+                "lojas": ["*"]
+                },
+                "edvaldo": {
+                "nivel": 3,
+                "lojas": ["*"]
+                }
         }
         with users_file.open("w", encoding="utf-8") as f:
             json.dump(default_user, f, indent=4)
